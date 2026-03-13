@@ -339,7 +339,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
         <div class="slabel">Scenario Builder</div>
         <div class="arv-wrap">
           <label>Adjust Sale Price (ARV)</label>
-          <input type="range" id="arvSlider" min="300000" max="900000" step="5000" oninput="updateCalc();syncArvCard()">
+          <input type="range" id="arvSlider" min="300000" max="900000" step="1000" oninput="updateCalc();syncArvCard()">
           <div class="arv-display" id="arvDisplay">—</div>
         </div>
 
@@ -804,8 +804,9 @@ async function loadProp(p){
   document.getElementById('ph-status').textContent=p.status||'In Rehab';
 
   const sl=document.getElementById('arvSlider');
-  sl.min=Math.round(p.purchase_price*0.7);
+  sl.min=Math.round(p.purchase_price*0.4);
   sl.max=Math.round(p.purchase_price*2.8);
+  sl.step=1000;
   sl.value=p.arv_estimate||p.purchase_price*1.45;
 
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -904,8 +905,9 @@ async function saveField(key){
   // Fix #6: update ARV slider bounds when purchase price changes
   if(key==='purchase_price'){
     const sl=document.getElementById('arvSlider');
-    sl.min=Math.round(val*0.7);
+    sl.min=Math.round(val*0.4);
     sl.max=Math.round(val*2.8);
+    sl.step=1000;
   }
   // Fix #1: auto-sync your_cash_in when earnest or down payment change
   if(key==='earnest_money'||key==='down_payment'){
@@ -980,7 +982,7 @@ function updateCalc(){
   if(cur.closing_date){
     daysHeld=Math.max(0,Math.round((Date.now()-new Date(cur.closing_date).getTime())/(1000*60*60*24)));
   }
-  const dailyCost=daysHeld>0?totalOOP/daysHeld:null;
+  const dailyCost=monthly/30;
 
   // Fix #7: gross margin
   const grossMarginPct=arv>0?(net/arv*100):0;
@@ -1006,7 +1008,7 @@ function updateCalc(){
   const msMargin=document.getElementById('ms-gross-margin');
   const msLtv=document.getElementById('ms-ltv-main');
   if(msDays) msDays.textContent=daysHeld!==null?daysHeld+' days':'No date set';
-  if(msDaily) msDaily.textContent=dailyCost?'$'+dailyCost.toFixed(0)+'/day':'—';
+  if(msDaily) msDaily.textContent='$'+Math.round(dailyCost).toLocaleString('en-US')+'/day';
   if(msMargin){
     msMargin.textContent=grossMarginPct.toFixed(1)+'%';
     msMargin.className='ms-val '+(grossMarginPct>=15?'green':grossMarginPct>=5?'gold':'red');
