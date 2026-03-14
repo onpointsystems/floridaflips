@@ -105,11 +105,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 .ef-save{background:var(--gold);color:#0a0b0e;font-weight:600}
 .ef-cancel{background:var(--border);color:var(--muted2)}
 
-/* ─── ARV SLIDER ─── */
-.arv-wrap{background:var(--gold-dim);border:1px solid rgba(232,160,32,.2);border-radius:10px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-.arv-wrap label{font-size:11px;font-family:var(--mono);color:var(--gold);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
-.arv-wrap input[type=range]{flex:1;min-width:200px;accent-color:var(--gold)}
-.arv-display{font-family:var(--mono);font-size:18px;color:var(--gold);white-space:nowrap;min-width:100px;text-align:right}
+/* ─── ARV SLIDER (removed) ─── */
 
 /* ─── DEAL LEDGER ─── */
 .ledger-wrap{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:24px}
@@ -335,14 +331,6 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
 
         <div class="slabel" style="margin-top:4px">Active Deal Numbers <span style="color:var(--gold);font-size:9px;margin-left:4px">CLICK EDIT TO UPDATE</span></div>
         <div class="editable-grid" id="editableGrid-active"></div>
-
-        <!-- ARV Slider -->
-        <div class="slabel">Adjust Sale Price</div>
-        <div class="arv-wrap">
-          <label>Adjust Sale Price (ARV)</label>
-          <input type="range" id="arvSlider" min="300000" max="900000" step="1000" oninput="updateCalc();syncArvCard()">
-          <div class="arv-display" id="arvDisplay">—</div>
-        </div>
 
         <!-- Deal Pulse mini-stats -->
         <div class="mini-stats" style="margin-bottom:20px">
@@ -804,12 +792,6 @@ async function loadProp(p){
   document.getElementById('ph-sub').textContent='Valrico, FL 33596 · Emilio Pereira · Easy Street Capital';
   document.getElementById('ph-status').textContent=p.status||'In Rehab';
 
-  const sl=document.getElementById('arvSlider');
-  sl.min=Math.round(p.purchase_price*0.4/1000)*1000;
-  sl.max=Math.round(p.purchase_price*2.8/1000)*1000;
-  sl.step=1000;
-  sl.value=p.arv_estimate||p.purchase_price*1.45;
-
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab')[0].classList.add('active');
@@ -905,20 +887,6 @@ async function saveField(key){
   document.getElementById('efv-'+key).textContent=dispVal;
   document.getElementById('efw-'+key).style.display='none';
   if(key==='status') document.getElementById('ph-status').textContent=val;
-  if(key==='arv_estimate'){
-    const sl=document.getElementById('arvSlider');
-    sl.value=val;
-    // Update slider bounds if needed
-    if(val<sl.min) sl.min=Math.round(val*0.7);
-    if(val>sl.max) sl.max=Math.round(val*1.5);
-  }
-  // Fix #6: update ARV slider bounds when purchase price changes
-  if(key==='purchase_price'){
-    const sl=document.getElementById('arvSlider');
-    sl.min=Math.round(val*0.4/1000)*1000;
-    sl.max=Math.round(val*2.8/1000)*1000;
-    sl.step=1000;
-  }
   // Fix #1: auto-sync your_cash_in when earnest or down payment change
   if(key==='earnest_money'||key==='down_payment'){
     const newCashIn=(cur.earnest_money||0)+(cur.down_payment||0);
@@ -926,9 +894,8 @@ async function saveField(key){
       const {error:cashErr}=await sb.from('properties').update({your_cash_in:newCashIn}).eq('id',cur.id);
       if(!cashErr){
         cur.your_cash_in=newCashIn;
-        const cashField=FIELDS.find(x=>x.key==='your_cash_in');
         const cashValEl=document.getElementById('efv-your_cash_in');
-        if(cashValEl&&cashField) cashValEl.textContent='$'+Math.round(newCashIn).toLocaleString('en-US');
+        if(cashValEl) cashValEl.textContent='$'+Math.round(newCashIn).toLocaleString('en-US');
         const cashIdx=props.findIndex(p=>p.id===cur.id);
         if(cashIdx>-1) props[cashIdx].your_cash_in=newCashIn;
       }
@@ -938,15 +905,6 @@ async function saveField(key){
   if(idx>-1) props[idx]=cur;
   updateCalc();
   toast(f.label+' updated ✓');
-}
-
-// ── ARV CARD SYNC ──
-function syncArvCard(){
-  const val=parseInt(document.getElementById('arvSlider').value);
-  if(!cur)return;
-  cur.arv_estimate=val;
-  const cardVal=document.getElementById('efv-arv_estimate');
-  if(cardVal) cardVal.textContent='$'+Math.round(val).toLocaleString('en-US');
 }
 
 // ── MONTHS BILLED (1st of month billing, skip closing month) ──
@@ -964,7 +922,7 @@ function calcMonthsBilled(closingDate){
 // ── CALC ──
 function updateCalc(){
   if(!cur)return;
-  const arv=parseInt(document.getElementById('arvSlider').value)||0;
+  const arv=cur.arv_estimate||0;
   const payoff=cur.loan_payoff||0;
   const earnest=cur.earnest_money||0;
   const down=cur.down_payment||0;
@@ -1011,9 +969,6 @@ function updateCalc(){
   // ── Your Cash In display sync ──
   const cashInEl=document.getElementById('efv-your_cash_in');
   if(cashInEl) cashInEl.textContent=principal>0?'$'+Math.round(principal).toLocaleString('en-US'):'—';
-
-  // ── ARV display ──
-  document.getElementById('arvDisplay').textContent=arv>0?fmt(arv):'—';
 
   // ── Ledger ──
   document.getElementById('l-arv').textContent=arv>0?fmt(arv):'—';
@@ -1513,7 +1468,7 @@ async function toggleAccess(userId,propId,grant){
 // ── PRINT REPORT ──
 function printReport(){
   if(!cur){toast('Select a property first','err');return;}
-  const arv=parseInt(document.getElementById('arvSlider').value)||0;
+  const arv=cur.arv_estimate||0;
   const payoff=cur.loan_payoff||0;
   const earnest=cur.earnest_money||0;
   const down=cur.down_payment||0;
