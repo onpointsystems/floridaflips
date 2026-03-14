@@ -330,13 +330,14 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
       <div class="tab-content active" id="tab-overview">
 
         <!-- Editable metrics -->
-        <div class="slabel">Deal Numbers <span style="color:var(--gold);font-size:9px;margin-left:4px">CLICK EDIT TO UPDATE</span></div>
-        <div class="editable-grid" id="editableGrid">
-          <!-- populated by JS -->
-        </div>
+        <div class="slabel">Acquisition <span style="color:var(--gold);font-size:9px;margin-left:4px">SET AT PURCHASE</span></div>
+        <div class="editable-grid" id="editableGrid-acquisition"></div>
+
+        <div class="slabel" style="margin-top:4px">Active Deal Numbers <span style="color:var(--gold);font-size:9px;margin-left:4px">CLICK EDIT TO UPDATE</span></div>
+        <div class="editable-grid" id="editableGrid-active"></div>
 
         <!-- ARV Slider -->
-        <div class="slabel">Scenario Builder</div>
+        <div class="slabel">Adjust Sale Price</div>
         <div class="arv-wrap">
           <label>Adjust Sale Price (ARV)</label>
           <input type="range" id="arvSlider" min="300000" max="900000" step="1000" oninput="updateCalc();syncArvCard()">
@@ -348,7 +349,6 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
           <div class="mstat"><div class="ms-lbl">Days Held</div><div class="ms-val gold" id="ms-days-held">—</div></div>
           <div class="mstat"><div class="ms-lbl">Daily Hold Cost</div><div class="ms-val red" id="ms-daily-cost">—</div></div>
           <div class="mstat"><div class="ms-lbl">Gross Margin</div><div class="ms-val" id="ms-gross-margin">—</div></div>
-          <div class="mstat"><div class="ms-lbl">LTV</div><div class="ms-val" id="ms-ltv-main">—</div></div>
         </div>
 
         <!-- Deal Ledger -->
@@ -368,6 +368,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             <div class="lrow"><span class="ll">− Closing Costs (<span id="l-closing-pct">2</span>%)</span><span class="lv neg" id="l-closing">—</span></div>
             <div class="lrow"><span class="ll">− Your Principal Returned</span><span class="lv neg" id="l-principal">—</span></div>
             <div class="lrow divider"><span class="ll">= Net Proceeds Pool</span><span class="lv big" id="l-net">—</span></div>
+            <div class="lrow" style="border:none;padding-top:6px;padding-bottom:2px"><span class="ll" style="font-size:11px;color:var(--muted)">LTV</span><span class="lv" id="l-ltv" style="font-size:11px;color:var(--muted)">—</span></div>
             <div class="lrow spacer sa-only" id="row-40pct"><span class="ll gold">Your 40% of Net Proceeds</span><span class="lv gold" id="l-40pct">—</span></div>
             <div class="lrow sa-only" id="row-principal2"><span class="ll">Your Principal Back</span><span class="lv" id="l-principal2">—</span></div>
             <div class="lrow"><span class="ll" id="l-interest-label">− Total Interest Paid</span><span class="lv neg" id="l-interest">—</span></div>
@@ -387,7 +388,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             </div>
             <div style="margin-top:14px">
               <div class="lrow"><span class="ll" style="font-size:12px">Rehab Budget (team est.)</span><span class="lv" style="font-size:12px" id="ov-budget">—</span></div>
-              <div class="lrow"><span class="ll" style="font-size:12px">Financed (Easy Street)</span><span class="lv" style="font-size:12px" id="ov-financed">—</span></div>
+              <div class="lrow"><span class="ll" style="font-size:12px">Financed</span><span class="lv" style="font-size:12px" id="ov-financed">—</span></div>
               <div class="lrow"><span class="ll" style="font-size:12px">Logged Expenses</span><span class="lv neg" style="font-size:12px" id="ov-logged">—</span></div>
               <div class="lrow"><span class="ll" style="font-size:12px">Draw Remaining</span><span class="lv green" style="font-size:12px" id="ov-draw-rem">—</span></div>
             </div>
@@ -804,8 +805,8 @@ async function loadProp(p){
   document.getElementById('ph-status').textContent=p.status||'In Rehab';
 
   const sl=document.getElementById('arvSlider');
-  sl.min=Math.round(p.purchase_price*0.4);
-  sl.max=Math.round(p.purchase_price*2.8);
+  sl.min=Math.round(p.purchase_price*0.4/1000)*1000;
+  sl.max=Math.round(p.purchase_price*2.8/1000)*1000;
   sl.step=1000;
   sl.value=p.arv_estimate||p.purchase_price*1.45;
 
@@ -825,33 +826,42 @@ async function loadProp(p){
 
 // ── EDITABLE GRID ──
 const FIELDS=[
-  {key:'purchase_price',label:'Purchase Price',color:'blue',prefix:'$',type:'number'},
-  {key:'loan_payoff',label:'Loan Payoff',color:'red',prefix:'$',type:'number'},
-  {key:'your_cash_in',label:'Your Cash In',color:'gold',prefix:'$',type:'number',sub:'Earnest + Down'},
-  {key:'rehab_budget',label:'Rehab Budget',color:'gold',prefix:'$',type:'number'},
-  {key:'arv_estimate',label:'ARV Estimate',color:'green',prefix:'$',type:'number'},
-  {key:'monthly_interest',label:'Monthly Interest',color:'',prefix:'$',type:'number'},
-  {key:'interest_paid_months',label:'Months Interest Paid',color:'',prefix:'',suffix:' mo',type:'number',step:'0.5'},
-  {key:'realtor_commission',label:'Realtor Commission',color:'red',prefix:'',suffix:'%',type:'number',step:'0.1',sub:'Default 6%'},
-  {key:'closing_costs_pct',label:'Closing Costs',color:'',prefix:'',suffix:'%',type:'number',step:'0.1',sub:'Default 2%'},
-  {key:'earnest_money',label:'Earnest Money',color:'',prefix:'$',type:'number'},
-  {key:'down_payment',label:'Down Payment',color:'',prefix:'$',type:'number'},
-  {key:'closing_date',label:'Closing Date',color:'blue',prefix:'',type:'date',sub:'Click to pick date'},
-  {key:'heloc_apr',label:'HELOC APR',color:'red',prefix:'',suffix:'%',type:'number',step:'0.01',sub:'0 if cash used'},
-  {key:'status',label:'Status',color:'',prefix:'',type:'select',opts:['In Rehab','Listed','Under Contract','Sold']},
+  // ── ACQUISITION ──
+  {key:'purchase_price',label:'Purchase Price',color:'blue',prefix:'$',type:'number',section:'acquisition'},
+  {key:'loan_payoff',label:'Loan Payoff',color:'red',prefix:'$',type:'number',section:'acquisition'},
+  {key:'rehab_financed',label:'Rehab Financed',color:'blue',prefix:'$',type:'number',section:'acquisition',sub:'From lender'},
+  {key:'earnest_money',label:'Earnest Money',color:'',prefix:'$',type:'number',section:'acquisition'},
+  {key:'down_payment',label:'Down Payment',color:'',prefix:'$',type:'number',section:'acquisition'},
+  {key:'your_cash_in',label:'Your Cash In',color:'gold',prefix:'$',type:'number',section:'acquisition',sub:'Earnest + Down',readOnly:true},
+  {key:'closing_date',label:'Closing Date',color:'blue',prefix:'',type:'date',section:'acquisition',sub:'Click to pick date'},
+  {key:'heloc_apr',label:'HELOC APR',color:'red',prefix:'',suffix:'%',type:'number',step:'0.01',section:'acquisition',sub:'0 if cash used',saOnly:true},
+  {key:'heloc_amount',label:'HELOC Amount Used',color:'red',prefix:'$',type:'number',section:'acquisition',sub:'Portion from HELOC',saOnly:true},
+  // ── ACTIVE ──
+  {key:'rehab_budget',label:'Rehab Budget',color:'gold',prefix:'$',type:'number',section:'active'},
+  {key:'arv_estimate',label:'ARV Estimate',color:'green',prefix:'$',type:'number',section:'active'},
+  {key:'monthly_interest',label:'Monthly Interest',color:'',prefix:'$',type:'number',section:'active'},
+  {key:'realtor_commission',label:'Realtor Commission',color:'red',prefix:'',suffix:'%',type:'number',step:'0.1',section:'active',sub:'Default 6%'},
+  {key:'closing_costs_pct',label:'Closing Costs',color:'',prefix:'',suffix:'%',type:'number',step:'0.1',section:'active',sub:'Default 2%'},
+  {key:'status',label:'Status',color:'',prefix:'',type:'select',section:'active',opts:['In Rehab','Listed','Under Contract','Sold']},
 ];
 
 function buildEditableGrid(){
-  const grid=document.getElementById('editableGrid');
-  grid.innerHTML='';
+  const acqGrid=document.getElementById('editableGrid-acquisition');
+  const actGrid=document.getElementById('editableGrid-active');
+  acqGrid.innerHTML='';
+  actGrid.innerHTML='';
   FIELDS.forEach(f=>{
+    if(f.saOnly&&!isSuperAdmin) return;
+    const grid=f.section==='acquisition'?acqGrid:actGrid;
     const val=cur[f.key]!=null?cur[f.key]:'—';
     const dispVal=f.type==='select'?val:f.type==='date'?(val&&val!=='—'?val.split('-').slice(1).concat(val.split('-')[0]).join('-'):val):(typeof val==='number'?(f.prefix||'')+Math.round(val).toLocaleString('en-US')+(f.suffix||''):val);
     const div=document.createElement('div');
     div.className='efield '+(f.color||'');
     div.id='ef-'+f.key;
-    const editBtn=isAdmin?`<span class="ef-edit-btn" onclick="toggleEdit('${f.key}')">EDIT</span>`:'';
-    const inputHtml=isAdmin?`
+    // readOnly fields never show edit button or input
+    const canEdit=isAdmin&&!f.readOnly;
+    const editBtn=canEdit?`<span class="ef-edit-btn" onclick="toggleEdit('${f.key}')">EDIT</span>`:'';
+    const inputHtml=canEdit?`
       <div class="ef-input-wrap" id="efw-${f.key}">
         ${f.type==='select'
           ?`<select id="efi-${f.key}" style="width:100%;background:var(--bg);border:1px solid var(--gold);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:13px;padding:7px 10px;outline:none">${f.opts.map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('')}</select>`
@@ -865,7 +875,7 @@ function buildEditableGrid(){
         </div>
       </div>`:'';
     div.innerHTML=`
-      <div class="ef-label">${f.label}${editBtn}</div>
+      <div class="ef-label">${f.label}${f.readOnly?'<span style="font-size:9px;color:var(--muted);margin-left:4px">AUTO</span>':''}${editBtn}</div>
       <div class="ef-val" id="efv-${f.key}">${dispVal}</div>
       ${f.sub?`<div class="ef-sub">${f.sub}</div>`:''}
       ${inputHtml}
@@ -905,8 +915,8 @@ async function saveField(key){
   // Fix #6: update ARV slider bounds when purchase price changes
   if(key==='purchase_price'){
     const sl=document.getElementById('arvSlider');
-    sl.min=Math.round(val*0.4);
-    sl.max=Math.round(val*2.8);
+    sl.min=Math.round(val*0.4/1000)*1000;
+    sl.max=Math.round(val*2.8/1000)*1000;
     sl.step=1000;
   }
   // Fix #1: auto-sync your_cash_in when earnest or down payment change
@@ -939,97 +949,116 @@ function syncArvCard(){
   if(cardVal) cardVal.textContent='$'+Math.round(val).toLocaleString('en-US');
 }
 
+// ── MONTHS BILLED (1st of month billing, skip closing month) ──
+function calcMonthsBilled(closingDate){
+  if(!closingDate) return 0;
+  const closing=new Date(closingDate+'T00:00:00');
+  const today=new Date();
+  let count=0;
+  // First billing = 1st of the month after the closing month
+  let billing=new Date(closing.getFullYear(),closing.getMonth()+2,1);
+  while(billing<=today){count++;billing=new Date(billing.getFullYear(),billing.getMonth()+1,1);}
+  return count;
+}
+
 // ── CALC ──
 function updateCalc(){
   if(!cur)return;
-  const arv=parseInt(document.getElementById('arvSlider').value);
-  const payoff=cur.loan_payoff||358500;
-  const principal=cur.your_cash_in||(((cur.earnest_money||0)+(cur.down_payment||0))||85000);
-  const monthly=cur.monthly_interest||2957.63;
-  const months=cur.interest_paid_months||2;
+  const arv=parseInt(document.getElementById('arvSlider').value)||0;
+  const payoff=cur.loan_payoff||0;
+  const earnest=cur.earnest_money||0;
+  const down=cur.down_payment||0;
+  const principal=earnest+down;
+  const monthly=cur.monthly_interest||0;
+  const months=calcMonthsBilled(cur.closing_date);
   const estMonths=months+1;
   const interest=monthly*estMonths;
-  const earnest=cur.earnest_money!=null?cur.earnest_money:5000;
-  const down=cur.down_payment!=null?cur.down_payment:80000;
-  const budget=cur.rehab_budget||75000;
+  const budget=cur.rehab_budget||0;
+  const rehabFinanced=cur.rehab_financed||0;
   const realtorPct=(cur.realtor_commission!=null?cur.realtor_commission:6)/100;
   const closingPct=(cur.closing_costs_pct!=null?cur.closing_costs_pct:2)/100;
 
-  // Rehab expenses — calculate early so we can use in OOP
+  // Rehab expenses — early for OOP
   const expTotal=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
 
-  // HELOC interest calc — accrues daily from closing date
-  const helocFunds=earnest+down;
+  // HELOC interest — accrues daily from closing date
+  const helocFunds=cur.heloc_amount!=null?cur.heloc_amount:principal;
   const helocApr=(cur.heloc_apr||0)/100;
   let helocInterest=0;
   if(helocApr>0&&cur.closing_date&&helocFunds>0){
     const daysDiff=Math.max(0,(Date.now()-new Date(cur.closing_date).getTime())/(1000*60*60*24));
     helocInterest=helocFunds*(helocApr/365)*daysDiff;
   }
+
   const realtor=arv*realtorPct;
   const closing=arv*closingPct;
   const net=arv-payoff-realtor-closing-principal;
   const share40=net>0?net*0.40:0;
   const profit=share40-interest-helocInterest;
-  const roi=(profit/principal)*100;
-  const ltv=(payoff/arv)*100;
+  const roi=principal>0?(profit/principal)*100:0;
+  const ltv=arv>0?(payoff/arv)*100:0;
   const intPaid=monthly*months;
-  // Fix #4: include logged rehab expenses in real out-of-pocket
-  const totalOOP=earnest+down+intPaid+helocInterest+expTotal;
+  const totalOOP=principal+intPaid+helocInterest+expTotal;
 
-  // Fix #2: days held from closing date
+  // Days held
   let daysHeld=null;
   if(cur.closing_date){
     daysHeld=Math.max(0,Math.round((Date.now()-new Date(cur.closing_date).getTime())/(1000*60*60*24)));
   }
-  const dailyCost=monthly/30;
-
-  // Fix #7: gross margin
+  const dailyCost=monthly>0?monthly/30:0;
   const grossMarginPct=arv>0?(net/arv*100):0;
 
-  document.getElementById('arvDisplay').textContent=fmt(arv);
-  document.getElementById('l-arv').textContent=fmt(arv);
-  document.getElementById('l-payoff').textContent='('+fmt(payoff)+')';
+  // ── Your Cash In display sync ──
+  const cashInEl=document.getElementById('efv-your_cash_in');
+  if(cashInEl) cashInEl.textContent=principal>0?'$'+Math.round(principal).toLocaleString('en-US'):'—';
+
+  // ── ARV display ──
+  document.getElementById('arvDisplay').textContent=arv>0?fmt(arv):'—';
+
+  // ── Ledger ──
+  document.getElementById('l-arv').textContent=arv>0?fmt(arv):'—';
+  document.getElementById('l-payoff').textContent=payoff>0?'('+fmt(payoff)+')':'—';
   document.getElementById('l-realtor-pct').textContent=(cur.realtor_commission!=null?cur.realtor_commission:6);
-  document.getElementById('l-realtor').textContent='('+fmt(realtor)+')';
+  document.getElementById('l-realtor').textContent=arv>0?'('+fmt(realtor)+')':'—';
   document.getElementById('l-closing-pct').textContent=(cur.closing_costs_pct!=null?cur.closing_costs_pct:2);
-  document.getElementById('l-closing').textContent='('+fmt(closing)+')';
-  document.getElementById('l-principal').textContent='('+fmt(principal)+')';
-  document.getElementById('l-principal2').textContent=fmt(principal);
-  // Fix #5: dynamic interest label with months and rate
+  document.getElementById('l-closing').textContent=arv>0?'('+fmt(closing)+')':'—';
+  document.getElementById('l-principal').textContent=principal>0?'('+fmt(principal)+')':'—';
+  document.getElementById('l-principal2').textContent=principal>0?fmt(principal):'—';
+
   const intLabel=document.getElementById('l-interest-label');
   if(intLabel) intLabel.textContent='\u2212 Total Interest ('+estMonths+' mo @ '+fmt(monthly)+'/mo)';
-  document.getElementById('l-interest').textContent='('+fmt(interest)+')';
-  document.getElementById('m-ltv')&&(document.getElementById('m-ltv').textContent=ltv.toFixed(1)+'%');
+  document.getElementById('l-interest').textContent=interest>0?'('+fmt(interest)+')':'—';
 
-  // Fix #2 + #7: update mini-stats row
+  // LTV in ledger
+  const ltvEl=document.getElementById('l-ltv');
+  if(ltvEl){
+    ltvEl.textContent=arv>0?ltv.toFixed(1)+'%':'—';
+    ltvEl.style.color=ltv<=70?'var(--green)':ltv<=85?'var(--gold)':'var(--red)';
+  }
+
+  // ── Mini-stats ──
   const msDays=document.getElementById('ms-days-held');
   const msDaily=document.getElementById('ms-daily-cost');
   const msMargin=document.getElementById('ms-gross-margin');
-  const msLtv=document.getElementById('ms-ltv-main');
   if(msDays) msDays.textContent=daysHeld!==null?daysHeld+' days':'No date set';
-  if(msDaily) msDaily.textContent='$'+Math.round(dailyCost).toLocaleString('en-US')+'/day';
+  if(msDaily) msDaily.textContent=dailyCost>0?'$'+Math.round(dailyCost).toLocaleString('en-US')+'/day':'—';
   if(msMargin){
-    msMargin.textContent=grossMarginPct.toFixed(1)+'%';
+    msMargin.textContent=arv>0?grossMarginPct.toFixed(1)+'%':'—';
     msMargin.className='ms-val '+(grossMarginPct>=15?'green':grossMarginPct>=5?'gold':'red');
-  }
-  if(msLtv){
-    msLtv.textContent=ltv.toFixed(1)+'%';
-    msLtv.className='ms-val '+(ltv<=70?'green':ltv<=85?'gold':'red');
   }
 
   const arvLabelEl=document.getElementById('arvLabel');
-  if(arvLabelEl) arvLabelEl.textContent='\u00b7 '+fmt(arv)+' ARV';
+  if(arvLabelEl) arvLabelEl.textContent=arv>0?'\u00b7 '+fmt(arv)+' ARV':'';
 
   const netEl=document.getElementById('l-net');
-  netEl.textContent=net>=0?fmt(net):'-'+fmt(Math.abs(net));
+  netEl.textContent=arv>0?(net>=0?fmt(net):'-'+fmt(Math.abs(net))):'—';
   netEl.className='lv big '+(net>=0?'pos':'neg');
 
   const s40=document.getElementById('l-40pct');
-  s40.textContent=net>0?fmt(share40):'(no proceeds)';
+  s40.textContent=net>0?fmt(share40):'—';
   s40.className='lv gold';
 
-  // HELOC row — dynamically inserted for super_admin only
+  // HELOC row — super_admin only
   let helocRow=document.getElementById('row-heloc');
   if(helocInterest>0&&isSuperAdmin){
     if(!helocRow){
@@ -1043,7 +1072,6 @@ function updateCalc(){
       ref.parentNode.insertBefore(helocRow,ref);
     }
     document.getElementById('l-heloc').textContent='('+fmt(helocInterest)+')';
-
   } else if(helocRow){helocRow.remove();}
 
   const n2=document.getElementById('l-net2');
@@ -1051,33 +1079,32 @@ function updateCalc(){
   n2.className='lv big '+(profit>=0?'pos':'neg');
 
   const roiEl=document.getElementById('l-roi');
-  roiEl.textContent=roi.toFixed(1)+'%';
+  roiEl.textContent=principal>0?roi.toFixed(1)+'%':'—';
   roiEl.style.color=roi>=0?'var(--green)':'var(--red)';
 
   const vEl=document.getElementById('verdict');
-  if(profit>5000){vEl.className='verdict win';vEl.textContent='\u25b2 Making Money';}
+  if(!arv||!payoff){vEl.className='verdict even';vEl.textContent='Enter data to calculate';}
+  else if(profit>5000){vEl.className='verdict win';vEl.textContent='\u25b2 Making Money';}
   else if(profit<-2000){vEl.className='verdict loss';vEl.textContent='\u25bc Losing Money';}
   else{vEl.className='verdict even';vEl.textContent='\u2248 Break Even';}
 
-  const be=(interest/0.4+payoff+principal)/(1-realtorPct-closingPct);
-  document.getElementById('breakEven').textContent=fmt(Math.ceil(be/5000)*5000);
+  const be=(1-realtorPct-closingPct)>0?(interest/0.4+payoff+principal)/(1-realtorPct-closingPct):0;
+  document.getElementById('breakEven').textContent=be>0?fmt(Math.ceil(be/5000)*5000):'—';
 
-  const drawPct=Math.min((expTotal/budget)*100,100);
-  document.getElementById('ov-budget').textContent=fmt(budget);
-  // Fix #3: update financed from loan_payoff
+  const drawPct=budget>0?Math.min((expTotal/budget)*100,100):0;
+  document.getElementById('ov-budget').textContent=budget>0?fmt(budget):'—';
   const financedEl=document.getElementById('ov-financed');
-  if(financedEl) financedEl.textContent=fmt(payoff);
-  document.getElementById('ov-logged').textContent=fmt(expTotal);
-  document.getElementById('ov-draw-rem').textContent=fmt(Math.max(0,budget-expTotal));
-  document.getElementById('ov-draw-used').textContent=fmt(expTotal)+' / '+fmt(budget);
+  if(financedEl) financedEl.textContent=rehabFinanced>0?fmt(rehabFinanced):'—';
+  document.getElementById('ov-logged').textContent=expTotal>0?fmt(expTotal):'$0';
+  document.getElementById('ov-draw-rem').textContent=budget>0?fmt(Math.max(0,budget-expTotal)):'—';
+  document.getElementById('ov-draw-used').textContent=budget>0?fmt(expTotal)+' / '+fmt(budget):'—';
   document.getElementById('ov-bar').style.width=drawPct+'%';
-  document.getElementById('ov-earnest').textContent=fmt(earnest);
-  document.getElementById('ov-down').textContent=fmt(down);
-  document.getElementById('ov-int-paid').textContent=fmt(intPaid)+' ('+months+' mo)';
-  // Fix #4: show rehab expenses in OOP panel
+  document.getElementById('ov-earnest').textContent=earnest>0?fmt(earnest):'—';
+  document.getElementById('ov-down').textContent=down>0?fmt(down):'—';
+  document.getElementById('ov-int-paid').textContent=intPaid>0?fmt(intPaid)+' ('+months+' mo)':'—';
   const rehabExpEl=document.getElementById('ov-rehab-exp');
-  if(rehabExpEl) rehabExpEl.textContent=fmt(expTotal);
-  document.getElementById('ov-total-oop').textContent=fmt(totalOOP);
+  if(rehabExpEl) rehabExpEl.textContent=expTotal>0?fmt(expTotal):'$0';
+  document.getElementById('ov-total-oop').textContent=totalOOP>0?fmt(totalOOP):'—';
 }
 
 // ── EXPENSES ──
@@ -1090,7 +1117,7 @@ async function loadExps(){
 }
 
 function renderExps(){
-  const budget=cur?.rehab_budget||75000;
+  const budget=cur?.rehab_budget||0;
   const total=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
   const rem=budget-total;
   const pct=Math.min((total/budget)*100,100);
@@ -1334,7 +1361,7 @@ async function saveProp(){
     your_cash_in:(parseFloat(document.getElementById('f-earnest').value)||0)+(parseFloat(document.getElementById('f-down').value)||0),
     rehab_budget:parseFloat(document.getElementById('f-rehab').value)||0,
     arv_estimate:parseFloat(document.getElementById('f-arv').value)||null,
-    monthly_interest:parseFloat(document.getElementById('f-monthly').value)||2957.63,
+    monthly_interest:parseFloat(document.getElementById('f-monthly').value)||0,
     interest_paid_months:parseFloat(document.getElementById('f-months').value)||0,
     status:document.getElementById('f-status').value,
   };
@@ -1486,15 +1513,15 @@ async function toggleAccess(userId,propId,grant){
 // ── PRINT REPORT ──
 function printReport(){
   if(!cur){toast('Select a property first','err');return;}
-  const arv=parseInt(document.getElementById('arvSlider').value);
+  const arv=parseInt(document.getElementById('arvSlider').value)||0;
   const payoff=cur.loan_payoff||0;
-  const principal=cur.your_cash_in||0;
-  const monthly=cur.monthly_interest||0;
-  const months=cur.interest_paid_months||0;
-  const estMonths=months+1;
-  const interest=monthly*estMonths;
   const earnest=cur.earnest_money||0;
   const down=cur.down_payment||0;
+  const principal=earnest+down;
+  const monthly=cur.monthly_interest||0;
+  const months=calcMonthsBilled(cur.closing_date);
+  const estMonths=months+1;
+  const interest=monthly*estMonths;
   const budget=cur.rehab_budget||0;
   const realtorPct=(cur.realtor_commission!=null?cur.realtor_commission:6)/100;
   const closingPct=(cur.closing_costs_pct!=null?cur.closing_costs_pct:2)/100;
@@ -1503,12 +1530,12 @@ function printReport(){
   const net=arv-payoff-realtor-closing-principal;
   const share40=net>0?net*0.40:0;
   const profit=share40-interest;
-  const roi=(profit/principal)*100;
-  const ltv=(payoff/arv)*100;
+  const roi=principal>0?(profit/principal)*100:0;
+  const ltv=arv>0?(payoff/arv)*100:0;
   const intPaid=monthly*months;
-  const totalOOP=earnest+down+intPaid;
-  const be=(interest/0.4+payoff+principal)/(1-realtorPct-closingPct);
   const expTotal=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
+  const totalOOP=principal+intPaid+expTotal;
+  const be=(1-realtorPct-closingPct)>0?(interest/0.4+payoff+principal)/(1-realtorPct-closingPct):0;
   const verdict=profit>5000?'PROJECTED PROFIT':profit<-2000?'PROJECTED LOSS':'NEAR BREAK-EVEN';
   const verdictColor=profit>5000?'#1a7a3e':profit<-2000?'#8b1a1a':'#7a5a00';
   const now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
