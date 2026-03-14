@@ -351,10 +351,10 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
           </div>
           <div class="ledger">
             <div class="lrow"><span class="ll">Sale Price (ARV)</span><span class="lv pos" id="l-arv">—</span></div>
-            <div class="lrow"><span class="ll">− Loan Payoff (Easy Street)</span><span class="lv neg" id="l-payoff">—</span></div>
+            <div class="lrow"><span class="ll">− Loan Payoff</span><span class="lv neg" id="l-payoff">—</span></div>
             <div class="lrow"><span class="ll">− Realtor Commission (<span id="l-realtor-pct">6</span>%)</span><span class="lv neg" id="l-realtor">—</span></div>
             <div class="lrow"><span class="ll">− Closing Costs (<span id="l-closing-pct">2</span>%)</span><span class="lv neg" id="l-closing">—</span></div>
-            <div class="lrow"><span class="ll">− Your Principal Returned</span><span class="lv neg" id="l-principal">—</span></div>
+            <div class="lrow"><span class="ll">− Investors Principal Returned</span><span class="lv neg" id="l-principal">—</span></div>
             <div class="lrow divider"><span class="ll">= Net Proceeds Pool</span><span class="lv big" id="l-net">—</span></div>
             <div class="lrow" style="border:none;padding-top:6px;padding-bottom:2px"><span class="ll" style="font-size:11px;color:var(--muted)">LTV</span><span class="lv" id="l-ltv" style="font-size:11px;color:var(--muted)">—</span></div>
             <div class="lrow spacer sa-only" id="row-40pct"><span class="ll gold">Your 40% of Net Proceeds</span><span class="lv gold" id="l-40pct">—</span></div>
@@ -392,7 +392,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             <div class="lrow"><span class="ll" style="font-size:12px">Earnest Money</span><span class="lv neg" style="font-size:12px" id="ov-earnest">—</span></div>
             <div class="lrow"><span class="ll" style="font-size:12px">Down Payment</span><span class="lv neg" style="font-size:12px" id="ov-down">—</span></div>
             <div class="lrow"><span class="ll" style="font-size:12px">Interest Paid to Date</span><span class="lv neg" style="font-size:12px" id="ov-int-paid">—</span></div>
-            <div class="lrow"><span class="ll" style="font-size:12px">Logged Rehab Expenses</span><span class="lv neg" style="font-size:12px" id="ov-rehab-exp">—</span></div>
+            <div class="lrow" id="ov-rehab-oop-row" style="display:none"><span class="ll" style="font-size:12px">Rehab Over Financed</span><span class="lv neg" style="font-size:12px" id="ov-rehab-exp">—</span></div>
             <div class="lrow" style="border-top:2px solid var(--border2);padding-top:12px;margin-top:4px">
               <span class="ll" style="font-size:12px;color:var(--text);font-weight:600">Total Out of Pocket</span>
               <span class="lv" style="font-size:14px;color:var(--red)" id="ov-total-oop">—</span>
@@ -956,7 +956,9 @@ function updateCalc(){
   const roi=principal>0?(profit/principal)*100:0;
   const ltv=arv>0?(payoff/arv)*100:0;
   const intPaid=monthly*months;
-  const totalOOP=principal+intPaid+helocInterest+expTotal;
+  // Only count rehab spend beyond what's financed as truly out of pocket
+  const rehabOOP=Math.max(0,expTotal-rehabFinanced);
+  const totalOOP=principal+intPaid+helocInterest+rehabOOP;
 
   // Days held
   let daysHeld=null;
@@ -1058,7 +1060,13 @@ function updateCalc(){
   document.getElementById('ov-down').textContent=down>0?fmt(down):'—';
   document.getElementById('ov-int-paid').textContent=intPaid>0?fmt(intPaid)+' ('+months+' mo)':'—';
   const rehabExpEl=document.getElementById('ov-rehab-exp');
-  if(rehabExpEl) rehabExpEl.textContent=expTotal>0?fmt(expTotal):'$0';
+  const rehabOOPRow=document.getElementById('ov-rehab-oop-row');
+  if(rehabOOP>0){
+    if(rehabExpEl) rehabExpEl.textContent=fmt(rehabOOP);
+    if(rehabOOPRow) rehabOOPRow.style.display='flex';
+  } else {
+    if(rehabOOPRow) rehabOOPRow.style.display='none';
+  }
   document.getElementById('ov-total-oop').textContent=totalOOP>0?fmt(totalOOP):'—';
 }
 
@@ -1489,7 +1497,9 @@ function printReport(){
   const ltv=arv>0?(payoff/arv)*100:0;
   const intPaid=monthly*months;
   const expTotal=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
-  const totalOOP=principal+intPaid+expTotal;
+  const rehabFinanced=cur.rehab_financed||0;
+  const rehabOOP=Math.max(0,expTotal-rehabFinanced);
+  const totalOOP=principal+intPaid+rehabOOP;
   const be=(1-realtorPct-closingPct)>0?(interest/0.4+payoff+principal)/(1-realtorPct-closingPct):0;
   const verdict=profit>5000?'PROJECTED PROFIT':profit<-2000?'PROJECTED LOSS':'NEAR BREAK-EVEN';
   const verdictColor=profit>5000?'#1a7a3e':profit<-2000?'#8b1a1a':'#7a5a00';
@@ -1599,16 +1609,18 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
     <div class="section-header"><div class="section-num">02</div><div class="section-title">Deal Ledger — ${f(arv)} ARV Scenario</div><div class="section-line"></div></div>
     <table class="ledger">
       <tr><td>Sale Price (ARV)</td><td class="pos">${f(arv)}</td></tr>
-      <tr><td>− Loan Payoff (Easy Street Capital)</td><td class="neg">(${f(payoff)})</td></tr>
+      <tr><td>− Loan Payoff</td><td class="neg">(${f(payoff)})</td></tr>
       <tr><td>− Realtor Commission (${cur.realtor_commission!=null?cur.realtor_commission:6}%)</td><td class="neg">(${f(realtor)})</td></tr>
       <tr><td>− Closing Costs (${cur.closing_costs_pct!=null?cur.closing_costs_pct:2}%)</td><td class="neg">(${f(closing)})</td></tr>
-      <tr><td>− Your Principal Returned</td><td class="neg">(${f(principal)})</td></tr>
+      <tr><td>− Investors Principal Returned</td><td class="neg">(${f(principal)})</td></tr>
       <tr class="subtotal"><td>= Net Proceeds Pool</td><td class="${net>=0?'pos':'neg'}">${net>=0?f(net):'-'+f(Math.abs(net))}</td></tr>
+      ${isSuperAdmin?`
       <tr class="highlight"><td class="gold">Your 40% of Net Proceeds (Equity Share)</td><td class="gold">${net>0?f(share40):'— No proceeds'}</td></tr>
       <tr><td>Your Principal Back</td><td>${f(principal)}</td></tr>
       <tr><td>− Est. Total Interest (${estMonths} mo @ ${f(monthly)}/mo)</td><td class="neg">(${f(interest)})</td></tr>
       <tr class="subtotal"><td>NET TO YOU</td><td class="${profit>=0?'pos':'neg'}" style="font-size:15px">${f2(profit)}</td></tr>
       <tr><td style="color:#8892b0;font-size:12px">ROI on Your Cash</td><td style="font-family:'DM Mono',monospace;color:${roi>=0?'#1a6b35':'#b71c1c'};font-size:14px">${roi.toFixed(1)}%</td></tr>
+      `:''}
     </table>
     <div style="margin-top:14px;padding:12px 14px;background:#f7f8fc;border-left:3px solid #e8a020;font-size:11px;color:#5a6080;font-family:'DM Mono',monospace;line-height:1.7">* Estimates only. 40% equity share per agreement with Tampa Bay Cash Buyers LLC.</div>
   </div>
@@ -1620,6 +1632,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
         <div class="info-row"><span class="info-label">Earnest Money</span><span class="info-val neg">(${f(earnest)})</span></div>
         <div class="info-row"><span class="info-label">Down Payment</span><span class="info-val neg">(${f(down)})</span></div>
         <div class="info-row"><span class="info-label">Interest Paid (${months} mo)</span><span class="info-val neg">(${f(intPaid)})</span></div>
+        ${rehabOOP>0?`<div class="info-row"><span class="info-label">Rehab Over Financed</span><span class="info-val neg">(${f(rehabOOP)})</span></div>`:''}
         <div class="info-row" style="border-top:2px solid #1a1a2e;margin-top:4px;padding-top:12px"><span class="info-label" style="font-weight:600;color:#1a1a2e">Total Out of Pocket</span><span class="info-val neg" style="font-size:14px">(${f(totalOOP)})</span></div>
       </div>
       <div>
