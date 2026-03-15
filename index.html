@@ -430,7 +430,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             </div>
             <div class="fld"><label>Contractor / Vendor</label><input type="text" id="eVendor" placeholder="Name"></div>
             <div class="fld"><label>Description</label><input type="text" id="eDesc" placeholder="What was done"></div>
-            <div class="fld"><label>Amount ($)</label><input type="number" id="eAmount" placeholder="–140.33 for credit" step="0.01"></div>
+            <div class="fld"><label>Amount ($)</label><input type="number" id="eAmount" placeholder="0.00" step="0.01"></div>
             <div class="fld"><label>&nbsp;</label><button class="btn btn-gold" style="width:100%;height:38px" onclick="addExpense()">Add</button></div>
           </div>
         </div>
@@ -1170,7 +1170,7 @@ function editExp(id){
         </div>
         <div class="mf"><label>Contractor / Vendor</label><input type="text" id="ee-vendor" value="${e.vendor||''}"></div>
         <div class="mf"><label>Description</label><input type="text" id="ee-desc" value="${e.description||''}"></div>
-        <div class="mf full"><label>0.00</label><input type="number" id="ee-amount" value="${e.amount}" step="0.01"></div>
+        <div class="mf full"><label>Amount ($) — use negative for credits e.g. -140.33</label><input type="number" id="ee-amount" value="${e.amount}" step="0.01"></div>
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="document.getElementById('editExpModal').remove()">Cancel</button>
