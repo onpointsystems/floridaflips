@@ -306,9 +306,8 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
 
       <!-- Header -->
       <div class="prop-header">
-        <div class="ph-tag">ACTIVE FLIP · <span id="ph-entity">TAMPA BAY CASH BUYERS LLC</span></div>
+        <div class="ph-tag">ACTIVE FLIP</div>
         <div class="ph-address" id="ph-address">—</div>
-        <div class="ph-sub" id="ph-sub">—</div>
         <div class="status-pill"><span class="status-dot"></span><span id="ph-status">In Rehab</span></div>
         <div class="ph-actions">
           <button class="btn btn-ghost btn-sm" onclick="openModal(true)">Edit Property</button>
@@ -431,7 +430,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             </div>
             <div class="fld"><label>Contractor / Vendor</label><input type="text" id="eVendor" placeholder="Name"></div>
             <div class="fld"><label>Description</label><input type="text" id="eDesc" placeholder="What was done"></div>
-            <div class="fld"><label>Amount ($)</label><input type="number" id="eAmount" placeholder="0.00" min="0" step="0.01"></div>
+            <div class="fld"><label>Amount ($)</label><input type="number" id="eAmount" placeholder="–140.33 for credit" step="0.01"></div>
             <div class="fld"><label>&nbsp;</label><button class="btn btn-gold" style="width:100%;height:38px" onclick="addExpense()">Add</button></div>
           </div>
         </div>
@@ -789,7 +788,6 @@ async function loadProp(p){
   document.getElementById('propDetail').style.display='block';
 
   document.getElementById('ph-address').textContent=p.address;
-  document.getElementById('ph-sub').textContent='Valrico, FL 33596 · Emilio Pereira · Easy Street Capital';
   document.getElementById('ph-status').textContent=p.status||'In Rehab';
 
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -1096,16 +1094,25 @@ function renderExps(){
   tbody.innerHTML='';
   if(!exps.length){tbody.innerHTML='<tr class="empty-row"><td colspan="7">No expenses logged yet.</td></tr>';return;}
   exps.forEach((e,i)=>{
+    const isCredit=parseFloat(e.amount)<0;
+    const amtColor=isCredit?'var(--green)':'var(--red)';
+    const amtDisplay=isCredit?'+ '+fmt(Math.abs(parseFloat(e.amount))):fmt2(e.amount);
+    const actionCol=isAdmin
+      ?`<td style="text-align:center;white-space:nowrap">
+          ${isSuperAdmin?`<button class="del-btn" style="color:var(--gold);font-size:13px;margin-right:4px" onclick="editExp('${e.id}')">✎</button>`:''}
+          <button class="del-btn" onclick="delExp('${e.id}')">×</button>
+        </td>`
+      :'<td></td>';
     const tr=document.createElement('tr');
-    const delCol=isAdmin?`<td style="text-align:center"><button class="del-btn" onclick="delExp('${e.id}')">×</button></td>`:'<td></td>';
+    tr.id='exp-row-'+e.id;
     tr.innerHTML=`
       <td style="color:var(--muted)">${i+1}</td>
       <td>${e.date}</td>
       <td><span class="badge bg-${catColor(e.category)}">${e.category}</span></td>
       <td>${e.vendor||'—'}</td>
       <td style="color:var(--muted2)">${e.description||'—'}</td>
-      <td style="text-align:right;color:var(--red)">${fmt2(e.amount)}</td>
-      ${delCol}
+      <td style="text-align:right;color:${amtColor}">${amtDisplay}</td>
+      ${actionCol}
     `;
     tbody.appendChild(tr);
   });
@@ -1120,7 +1127,7 @@ async function addExpense(){
   const vendor=document.getElementById('eVendor').value.trim();
   const desc=document.getElementById('eDesc').value.trim();
   const amount=parseFloat(document.getElementById('eAmount').value);
-  if(!date||isNaN(amount)||amount<=0){toast('Date and amount required','err');return;}
+  if(!date||isNaN(amount)||amount===0){toast('Date and amount required','err');return;}
   const {data,error}=await sb.from('expenses').insert([{property_id:cur.id,date,category:cat,vendor,description:desc,amount}]).select();
   if(error){toast('Error: '+error.message,'err');return;}
   exps.unshift(data[0]);
@@ -1139,6 +1146,56 @@ async function delExp(id){
   exps=exps.filter(e=>e.id!==id);
   renderExps();
   toast('Deleted');
+}
+
+// ── EDIT EXPENSE (super_admin only) ──
+function editExp(id){
+  if(!isSuperAdmin)return;
+  const e=exps.find(x=>x.id===id);
+  if(!e)return;
+  // Remove any existing edit modal
+  const existing=document.getElementById('editExpModal');
+  if(existing) existing.remove();
+  const cats=['Labor','Materials','Permits','Plumbing','Electrical','HVAC','Roofing','Flooring','Paint','Draw Fee','Inspection','Other'];
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay open';
+  overlay.id='editExpModal';
+  overlay.innerHTML=`
+    <div class="modal" style="max-width:500px">
+      <div class="modal-title" style="font-size:18px">EDIT EXPENSE</div>
+      <div class="modal-grid">
+        <div class="mf"><label>Date</label><input type="date" id="ee-date" value="${e.date}"></div>
+        <div class="mf"><label>Category</label>
+          <select id="ee-cat">${cats.map(c=>`<option${c===e.category?' selected':''}>${c}</option>`).join('')}</select>
+        </div>
+        <div class="mf"><label>Contractor / Vendor</label><input type="text" id="ee-vendor" value="${e.vendor||''}"></div>
+        <div class="mf"><label>Description</label><input type="text" id="ee-desc" value="${e.description||''}"></div>
+        <div class="mf full"><label>Amount ($) — use negative for credits e.g. -140.33</label><input type="number" id="ee-amount" value="${e.amount}" step="0.01"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="document.getElementById('editExpModal').remove()">Cancel</button>
+        <button class="btn btn-gold" onclick="saveEditExp('${e.id}')">Save Changes</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById('ee-amount').focus();
+}
+
+async function saveEditExp(id){
+  if(!isSuperAdmin)return;
+  const date=document.getElementById('ee-date').value;
+  const category=document.getElementById('ee-cat').value;
+  const vendor=document.getElementById('ee-vendor').value.trim();
+  const description=document.getElementById('ee-desc').value.trim();
+  const amount=parseFloat(document.getElementById('ee-amount').value);
+  if(!date||isNaN(amount)||amount===0){toast('Date and amount required','err');return;}
+  const {error}=await sb.from('expenses').update({date,category,vendor,description,amount}).eq('id',id);
+  if(error){toast('Save failed: '+error.message,'err');return;}
+  const idx=exps.findIndex(x=>x.id===id);
+  if(idx>-1) exps[idx]={...exps[idx],date,category,vendor,description,amount};
+  document.getElementById('editExpModal').remove();
+  renderExps();
+  toast('Expense updated ✓');
 }
 
 function exportCSV(){
@@ -1582,7 +1639,6 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
 <div class="cover">
   <div class="cover-eyebrow">Investment Property Analysis Report</div>
   <div class="cover-title">${cur.address.toUpperCase()}</div>
-  <div class="cover-address">Borrower: Tampa Bay Cash Buyers LLC (Emilio Pereira) · Hard Money: Easy Street Capital</div>
   <div class="cover-meta">
     <div><div class="meta-label">Purchase Price</div><div class="meta-val">${f(cur.purchase_price)}</div></div>
     <div><div class="meta-label">ARV Used</div><div class="meta-val">${f(arv)}</div></div>
