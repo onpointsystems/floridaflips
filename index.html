@@ -1170,7 +1170,7 @@ function editExp(id){
         </div>
         <div class="mf"><label>Contractor / Vendor</label><input type="text" id="ee-vendor" value="${e.vendor||''}"></div>
         <div class="mf"><label>Description</label><input type="text" id="ee-desc" value="${e.description||''}"></div>
-        <div class="mf full"><label>Amount ($) — use negative for credits e.g. -140.33</label><input type="number" id="ee-amount" value="${e.amount}" step="0.01"></div>
+        <div class="mf full"><label>0.00</label><input type="number" id="ee-amount" value="${e.amount}" step="0.01"></div>
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="document.getElementById('editExpModal').remove()">Cancel</button>
