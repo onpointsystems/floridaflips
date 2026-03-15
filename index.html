@@ -362,7 +362,8 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             <div class="lrow divider sa-only" id="row-net2"><span class="ll">NET TO YOU</span><span class="lv big" id="l-net2">—</span></div>
             <div class="lrow sa-only" id="row-roi" style="border:none;padding-top:8px"><span class="ll" style="color:var(--muted)">ROI on Your Cash</span><span class="lv" id="l-roi" style="font-size:15px">—</span></div>
           </div>
-          <div class="ledger-note">* Estimates only. Actual closing costs, commissions, and final HUD will vary. Your 40% equity share per agreement with Tampa Bay Cash Buyers LLC. All numbers are editable above — update as the deal evolves.</div>
+          <div class="ledger-note" id="ledger-note-sa">* Estimates only. Actual closing costs, commissions, and final HUD will vary. Your 40% equity share per agreement with Tampa Bay Cash Buyers LLC. All numbers are editable above — update as the deal evolves.</div>
+          <div class="ledger-note" id="ledger-note-other">* Estimates only. Actual closing costs, commissions, and final HUD will vary. All numbers are editable above — update as the deal evolves.</div>
         </div>
 
         <!-- Two col -->
@@ -666,6 +667,12 @@ function applyRoleRestrictions(){
   document.querySelectorAll('.sa-only').forEach(el=>{
     el.style.display=isSuperAdmin?'flex':'none';
   });
+
+  // Ledger footnote — hide 40% equity language from non super_admin
+  const noteSA=document.getElementById('ledger-note-sa');
+  const noteOther=document.getElementById('ledger-note-other');
+  if(noteSA) noteSA.style.display=isSuperAdmin?'':'none';
+  if(noteOther) noteOther.style.display=isSuperAdmin?'none':'';
 
   // Import CSV — admin+ only
   const importBtn=document.getElementById('importCsvBtn');
@@ -1678,7 +1685,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
       <tr><td style="color:#8892b0;font-size:12px">ROI on Your Cash</td><td style="font-family:'DM Mono',monospace;color:${roi>=0?'#1a6b35':'#b71c1c'};font-size:14px">${roi.toFixed(1)}%</td></tr>
       `:''}
     </table>
-    <div style="margin-top:14px;padding:12px 14px;background:#f7f8fc;border-left:3px solid #e8a020;font-size:11px;color:#5a6080;font-family:'DM Mono',monospace;line-height:1.7">* Estimates only. 40% equity share per agreement with Tampa Bay Cash Buyers LLC.</div>
+    <div style="margin-top:14px;padding:12px 14px;background:#f7f8fc;border-left:3px solid #e8a020;font-size:11px;color:#5a6080;font-family:'DM Mono',monospace;line-height:1.7">* Estimates only.${isSuperAdmin?' 40% equity share per agreement with Tampa Bay Cash Buyers LLC.':''}</div>
   </div>
   <div class="section">
     <div class="section-header"><div class="section-num">03</div><div class="section-title">Cash Position & Break-Even Analysis</div><div class="section-line"></div></div>
