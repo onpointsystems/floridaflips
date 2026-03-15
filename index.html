@@ -1096,7 +1096,7 @@ function renderExps(){
   exps.forEach((e,i)=>{
     const isCredit=parseFloat(e.amount)<0;
     const amtColor=isCredit?'var(--green)':'var(--red)';
-    const amtDisplay=isCredit?'+ '+fmt(Math.abs(parseFloat(e.amount))):fmt2(e.amount);
+    const amtDisplay=isCredit?'+ $'+Math.abs(parseFloat(e.amount)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'$'+parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     const actionCol=isAdmin
       ?`<td style="text-align:center;white-space:nowrap">
           ${isSuperAdmin?`<button class="del-btn" style="color:var(--gold);font-size:13px;margin-right:4px" onclick="editExp('${e.id}')">✎</button>`:''}
