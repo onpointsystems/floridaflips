@@ -723,7 +723,7 @@ function buildEditableGrid(){
     if(f.saOnly&&!isSuperAdmin)return;
     const grid=f.section==='acquisition'?acqGrid:actGrid;
     const val=cur[f.key]!=null?cur[f.key]:'—';
-    const dispVal=f.type==='select'?val:f.type==='date'?(val&&val!=='—'?val.split('-').slice(1).concat(val.split('-')[0]).join('-'):val):(typeof val==='number'?(f.prefix||'')+Math.round(val).toLocaleString('en-US')+(f.suffix||''):val);
+    const dispVal=f.type==='select'?val:f.type==='date'?(val&&val!=='—'?val.split('-').slice(1).concat(val.split('-')[0]).join('-'):val):(typeof val==='number'?(f.prefix||'')+(f.suffix==='%'?parseFloat(val).toString():Math.round(val).toLocaleString('en-US'))+(f.suffix||''):val);
     const div=document.createElement('div');
     div.className='efield '+(f.color||'');
     div.id='ef-'+f.key;
@@ -773,7 +773,7 @@ async function saveField(key){
     return;
   }
   cur[key]=val;
-  const dispVal=f.type==='select'?val:f.type==='date'?(val?val.split('-').slice(1).concat(val.split('-')[0]).join('-'):val):(f.prefix||'')+Math.round(val).toLocaleString('en-US')+(f.suffix||'');
+  const dispVal=f.type==='select'?val:f.type==='date'?(val?val.split('-').slice(1).concat(val.split('-')[0]).join('-'):val):(f.prefix||'')+(f.suffix==='%'?parseFloat(val).toString():Math.round(val).toLocaleString('en-US'))+(f.suffix||'');
   document.getElementById('efv-'+key).textContent=dispVal;
   document.getElementById('efw-'+key).style.display='none';
   if(key==='status')document.getElementById('ph-status').textContent=val;
