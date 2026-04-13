@@ -430,14 +430,14 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
     <div class="modal-title" id="modalTitle">ADD PROPERTY</div>
     <div class="modal-grid">
       <div class="mf full"><label>Property Address</label><input type="text" id="f-address" placeholder="1204 Moondale Court, Valrico FL 33596"></div>
-      <div class="mf"><label>Purchase Price ($)</label><input type="number" id="f-purchase" placeholder="359000"></div>
-      <div class="mf"><label>Loan Payoff ($)</label><input type="number" id="f-payoff" placeholder="368900"></div>
+      <div class="mf"><label>Loan Amount / Payoff ($)</label><input type="number" id="f-payoff" placeholder="358500"></div>
+      <div class="mf"><label>Interest Rate (%)</label><input type="number" id="f-interest-rate" placeholder="9.9" step="0.01"></div>
       <div class="mf"><label>Earnest Money ($)</label><input type="number" id="f-earnest" placeholder="5000"></div>
       <div class="mf"><label>Down Payment ($)</label><input type="number" id="f-down" placeholder="76150"></div>
       <div class="mf"><label>Financed Rehab Budget ($)</label><input type="number" id="f-rehab" placeholder="63750"></div>
       <div class="mf"><label>Cash Rehab Budget ($)</label><input type="number" id="f-cash-rehab" placeholder="11250"></div>
       <div class="mf"><label>ARV Estimate ($)</label><input type="number" id="f-arv" placeholder="525000"></div>
-      <div class="mf"><label>Monthly Interest ($)</label><input type="number" id="f-monthly" placeholder="2957.63"></div>
+      <div class="mf"><label>Monthly Interest ($)</label><input type="number" id="f-monthly" placeholder="Auto-calculated"></div>
       <div class="mf"><label>Months Interest Paid</label><input type="number" id="f-months" placeholder="2" step="0.5"></div>
       <div class="mf">
         <label>Status</label>
@@ -449,7 +449,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
         </select>
       </div>
     </div>
-    <div class="modal-note">&#x1F4A1; Financed Rehab Budget = what the lender rolled into the loan. Cash Rehab Budget = what you pay out of pocket. Both are tracked against logged expenses.</div>
+    <div class="modal-note">&#x1F4A1; Enter Interest Rate to auto-calculate Monthly Interest. Financed Rehab = lender holdback rolled into loan. Cash Rehab = out of pocket portion.</div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
       <button class="btn btn-gold" onclick="saveProp()" id="saveBtn">Save Property</button>
@@ -697,8 +697,8 @@ async function loadProp(p){
 // ── EDITABLE GRID ──
 const FIELDS=[
   // ACQUISITION
-  {key:'purchase_price',label:'Purchase Price',color:'blue',prefix:'$',type:'number',section:'acquisition'},
-  {key:'loan_payoff',label:'Loan Payoff',color:'red',prefix:'$',type:'number',section:'acquisition',sub:'Incl. financed rehab'},
+  {key:'loan_payoff',label:'Loan Amount / Payoff',color:'red',prefix:'$',type:'number',section:'acquisition',sub:'Update with lender payoff at sale'},
+  {key:'interest_rate',label:'Interest Rate',color:'red',prefix:'',suffix:'%',type:'number',step:'0.01',section:'acquisition',sub:'Auto-calculates monthly payment'},
   {key:'earnest_money',label:'Earnest Money',color:'',prefix:'$',type:'number',section:'acquisition'},
   {key:'down_payment',label:'Down Payment',color:'',prefix:'$',type:'number',section:'acquisition'},
   {key:'your_cash_in',label:'Your Cash In',color:'gold',prefix:'$',type:'number',section:'acquisition',sub:'Earnest + Down',readOnly:true},
@@ -777,6 +777,23 @@ async function saveField(key){
   document.getElementById('efv-'+key).textContent=dispVal;
   document.getElementById('efw-'+key).style.display='none';
   if(key==='status')document.getElementById('ph-status').textContent=val;
+  // Auto-calc monthly interest when interest rate changes
+  if(key==='interest_rate'||key==='loan_payoff'){
+    const rate=(key==='interest_rate'?val:cur.interest_rate)||0;
+    const loanAmt=(key==='loan_payoff'?val:cur.loan_payoff)||0;
+    if(rate>0&&loanAmt>0){
+      const newMonthly=parseFloat((loanAmt*(rate/100/12)).toFixed(2));
+      const {error:mErr}=await sb.from('properties').update({monthly_interest:newMonthly}).eq('id',cur.id);
+      if(!mErr){
+        cur.monthly_interest=newMonthly;
+        const mEl=document.getElementById('efv-monthly_interest');
+        if(mEl)mEl.textContent='$'+Math.round(newMonthly).toLocaleString('en-US');
+        const mInp=document.getElementById('efi-monthly_interest');
+        if(mInp)mInp.value=newMonthly;
+        toast('Monthly interest auto-updated to $'+Math.round(newMonthly).toLocaleString('en-US'));
+      }
+    }
+  }
   if(key==='earnest_money'||key==='down_payment'){
     const newCashIn=(cur.earnest_money||0)+(cur.down_payment||0);
     if(newCashIn>0){
@@ -1221,8 +1238,8 @@ function openModal(edit=false){
   document.getElementById('saveBtn').textContent=edit?'Update':'Save Property';
   if(edit&&cur){
     document.getElementById('f-address').value=cur.address||'';
-    document.getElementById('f-purchase').value=cur.purchase_price||'';
     document.getElementById('f-payoff').value=cur.loan_payoff||'';
+    document.getElementById('f-interest-rate').value=cur.interest_rate||'';
     document.getElementById('f-earnest').value=cur.earnest_money||'';
     document.getElementById('f-down').value=cur.down_payment||'';
     document.getElementById('f-rehab').value=cur.rehab_budget||'';
@@ -1232,7 +1249,7 @@ function openModal(edit=false){
     document.getElementById('f-months').value=cur.interest_paid_months||'';
     document.getElementById('f-status').value=cur.status||'In Rehab';
   }else{
-    ['f-address','f-purchase','f-payoff','f-earnest','f-down','f-rehab','f-cash-rehab','f-arv','f-monthly','f-months'].forEach(id=>document.getElementById(id).value='');
+    ['f-address','f-payoff','f-interest-rate','f-earnest','f-down','f-rehab','f-cash-rehab','f-arv','f-monthly','f-months'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('f-status').value='In Rehab';
   }
   document.getElementById('propModal').classList.add('open');
@@ -1243,18 +1260,21 @@ function closeModal(){document.getElementById('propModal').classList.remove('ope
 async function saveProp(){
   if(!isAdmin)return;
   const address=document.getElementById('f-address').value.trim();
-  const purchase=parseFloat(document.getElementById('f-purchase').value);
-  if(!address||isNaN(purchase)){toast('Address and purchase price required','err');return;}
+  if(!address){toast('Property address required','err');return;}
+  const loanAmt=parseFloat(document.getElementById('f-payoff').value)||0;
+  const rate=parseFloat(document.getElementById('f-interest-rate').value)||0;
+  const autoMonthly=rate>0&&loanAmt>0?parseFloat((loanAmt*(rate/100/12)).toFixed(2)):parseFloat(document.getElementById('f-monthly').value)||0;
   const payload={
-    address,purchase_price:purchase,
-    loan_payoff:parseFloat(document.getElementById('f-payoff').value)||0,
+    address,
+    loan_payoff:loanAmt,
+    interest_rate:rate,
     earnest_money:parseFloat(document.getElementById('f-earnest').value)||0,
     down_payment:parseFloat(document.getElementById('f-down').value)||0,
     your_cash_in:(parseFloat(document.getElementById('f-earnest').value)||0)+(parseFloat(document.getElementById('f-down').value)||0),
     rehab_budget:parseFloat(document.getElementById('f-rehab').value)||0,
     cash_rehab_budget:parseFloat(document.getElementById('f-cash-rehab').value)||0,
     arv_estimate:parseFloat(document.getElementById('f-arv').value)||null,
-    monthly_interest:parseFloat(document.getElementById('f-monthly').value)||0,
+    monthly_interest:autoMonthly,
     interest_paid_months:parseFloat(document.getElementById('f-months').value)||0,
     status:document.getElementById('f-status').value,
   };
@@ -1487,7 +1507,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
   <div class="cover-eyebrow">Investment Property Analysis Report</div>
   <div class="cover-title">${cur.address.toUpperCase()}</div>
   <div class="cover-meta">
-    <div><div class="meta-label">Purchase Price</div><div class="meta-val">${f(cur.purchase_price)}</div></div>
+    <div><div class="meta-label">Loan Amount</div><div class="meta-val">${f(payoff)}</div></div>
     <div><div class="meta-label">ARV Used</div><div class="meta-val">${f(arv)}</div></div>
     <div><div class="meta-label">Your Cash In</div><div class="meta-val">${f(principal)}</div></div>
     <div><div class="meta-label">Projected ROI</div><div class="meta-val white">${roi.toFixed(1)}%</div></div>
@@ -1498,8 +1518,8 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
   <div class="section">
     <div class="section-header"><div class="section-num">01</div><div class="section-title">Deal Metrics</div><div class="section-line"></div></div>
     <div class="metric-grid">
-      <div class="metric"><div class="metric-label">Purchase Price</div><div class="metric-val blue">${f(cur.purchase_price)}</div></div>
-      <div class="metric"><div class="metric-label">Loan Payoff</div><div class="metric-val red">${f(payoff)}</div><div class="metric-sub">Incl. financed rehab</div></div>
+      <div class="metric"><div class="metric-label">Loan Amount / Payoff</div><div class="metric-val red">${f(payoff)}</div><div class="metric-sub">Incl. financed rehab</div></div>
+      <div class="metric"><div class="metric-label">Interest Rate</div><div class="metric-val red">${cur.interest_rate?parseFloat(cur.interest_rate)+'%':'—'}</div><div class="metric-sub">${f(monthly)}/mo</div></div>
       <div class="metric"><div class="metric-label">Financed Rehab</div><div class="metric-val blue">${f(rehabFinanced)}</div><div class="metric-sub">In loan payoff</div></div>
       <div class="metric"><div class="metric-label">Cash Rehab Budget</div><div class="metric-val red">${f(cashRehabBudget)}</div><div class="metric-sub">Out of pocket</div></div>
       <div class="metric"><div class="metric-label">Total Rehab Budget</div><div class="metric-val gold">${f(totalBudget)}</div><div class="metric-sub">${f(expTotal)} logged</div></div>
