@@ -430,6 +430,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
     <div class="modal-title" id="modalTitle">ADD PROPERTY</div>
     <div class="modal-grid">
       <div class="mf full"><label>Property Address</label><input type="text" id="f-address" placeholder="1204 Moondale Court, Valrico FL 33596"></div>
+      <div class="mf"><label>Purchase Price ($)</label><input type="number" id="f-purchase" placeholder="342000"></div>
       <div class="mf"><label>Loan Amount / Payoff ($)</label><input type="number" id="f-payoff" placeholder="358500"></div>
       <div class="mf"><label>Interest Rate (%)</label><input type="number" id="f-interest-rate" placeholder="9.9" step="0.01"></div>
       <div class="mf"><label>Earnest Money ($)</label><input type="number" id="f-earnest" placeholder="5000"></div>
@@ -697,6 +698,7 @@ async function loadProp(p){
 // ── EDITABLE GRID ──
 const FIELDS=[
   // ACQUISITION
+  {key:'purchase_price',label:'Purchase Price',color:'blue',prefix:'$',type:'number',section:'acquisition',sub:'What you paid'},
   {key:'loan_payoff',label:'Loan Amount / Payoff',color:'red',prefix:'$',type:'number',section:'acquisition',sub:'Update with lender payoff at sale'},
   {key:'interest_rate',label:'Interest Rate',color:'red',prefix:'',suffix:'%',type:'number',step:'0.01',section:'acquisition',sub:'Auto-calculates monthly payment'},
   {key:'earnest_money',label:'Earnest Money',color:'',prefix:'$',type:'number',section:'acquisition'},
@@ -1238,6 +1240,7 @@ function openModal(edit=false){
   document.getElementById('saveBtn').textContent=edit?'Update':'Save Property';
   if(edit&&cur){
     document.getElementById('f-address').value=cur.address||'';
+    document.getElementById('f-purchase').value=cur.purchase_price||'';
     document.getElementById('f-payoff').value=cur.loan_payoff||'';
     document.getElementById('f-interest-rate').value=cur.interest_rate||'';
     document.getElementById('f-earnest').value=cur.earnest_money||'';
@@ -1249,7 +1252,7 @@ function openModal(edit=false){
     document.getElementById('f-months').value=cur.interest_paid_months||'';
     document.getElementById('f-status').value=cur.status||'In Rehab';
   }else{
-    ['f-address','f-payoff','f-interest-rate','f-earnest','f-down','f-rehab','f-cash-rehab','f-arv','f-monthly','f-months'].forEach(id=>document.getElementById(id).value='');
+    ['f-address','f-purchase','f-payoff','f-interest-rate','f-earnest','f-down','f-rehab','f-cash-rehab','f-arv','f-monthly','f-months'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('f-status').value='In Rehab';
   }
   document.getElementById('propModal').classList.add('open');
@@ -1266,6 +1269,7 @@ async function saveProp(){
   const autoMonthly=rate>0&&loanAmt>0?parseFloat((loanAmt*(rate/100/12)).toFixed(2)):parseFloat(document.getElementById('f-monthly').value)||0;
   const payload={
     address,
+    purchase_price:parseFloat(document.getElementById('f-purchase').value)||0,
     loan_payoff:loanAmt,
     interest_rate:rate,
     earnest_money:parseFloat(document.getElementById('f-earnest').value)||0,
@@ -1507,6 +1511,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
   <div class="cover-eyebrow">Investment Property Analysis Report</div>
   <div class="cover-title">${cur.address.toUpperCase()}</div>
   <div class="cover-meta">
+    <div><div class="meta-label">Purchase Price</div><div class="meta-val">${f(cur.purchase_price||0)}</div></div>
     <div><div class="meta-label">Loan Amount</div><div class="meta-val">${f(payoff)}</div></div>
     <div><div class="meta-label">ARV Used</div><div class="meta-val">${f(arv)}</div></div>
     <div><div class="meta-label">Your Cash In</div><div class="meta-val">${f(principal)}</div></div>
@@ -1518,6 +1523,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
   <div class="section">
     <div class="section-header"><div class="section-num">01</div><div class="section-title">Deal Metrics</div><div class="section-line"></div></div>
     <div class="metric-grid">
+      <div class="metric"><div class="metric-label">Purchase Price</div><div class="metric-val blue">${f(cur.purchase_price||0)}</div></div>
       <div class="metric"><div class="metric-label">Loan Amount / Payoff</div><div class="metric-val red">${f(payoff)}</div><div class="metric-sub">Incl. financed rehab</div></div>
       <div class="metric"><div class="metric-label">Interest Rate</div><div class="metric-val red">${cur.interest_rate?parseFloat(cur.interest_rate)+'%':'—'}</div><div class="metric-sub">${f(monthly)}/mo</div></div>
       <div class="metric"><div class="metric-label">Financed Rehab</div><div class="metric-val blue">${f(rehabFinanced)}</div><div class="metric-sub">In loan payoff</div></div>
