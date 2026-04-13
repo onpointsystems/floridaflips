@@ -699,7 +699,6 @@ const FIELDS=[
   // ACQUISITION
   {key:'purchase_price',label:'Purchase Price',color:'blue',prefix:'$',type:'number',section:'acquisition'},
   {key:'loan_payoff',label:'Loan Payoff',color:'red',prefix:'$',type:'number',section:'acquisition',sub:'Incl. financed rehab'},
-  {key:'rehab_financed',label:'Rehab Financed',color:'blue',prefix:'$',type:'number',section:'acquisition',sub:'From lender'},
   {key:'earnest_money',label:'Earnest Money',color:'',prefix:'$',type:'number',section:'acquisition'},
   {key:'down_payment',label:'Down Payment',color:'',prefix:'$',type:'number',section:'acquisition'},
   {key:'your_cash_in',label:'Your Cash In',color:'gold',prefix:'$',type:'number',section:'acquisition',sub:'Earnest + Down',readOnly:true},
@@ -768,7 +767,11 @@ async function saveField(key){
   let val=f.type==='select'||f.type==='date'?inp.value:parseFloat(inp.value);
   if(f.type!=='select'&&f.type!=='date'&&isNaN(val)){toast('Enter a valid number','err');return;}
   const {error}=await sb.from('properties').update({[key]:val}).eq('id',cur.id);
-  if(error){toast('Save failed: '+error.message,'err');return;}
+  if(error){
+    console.error('saveField error',key,error);
+    toast('Save failed: '+error.message,'err');
+    return;
+  }
   cur[key]=val;
   const dispVal=f.type==='select'?val:f.type==='date'?(val?val.split('-').slice(1).concat(val.split('-')[0]).join('-'):val):(f.prefix||'')+Math.round(val).toLocaleString('en-US')+(f.suffix||'');
   document.getElementById('efv-'+key).textContent=dispVal;
