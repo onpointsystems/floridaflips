@@ -1573,11 +1573,6 @@ function printReport(){
   const payerTotals={};
   exps.forEach(e=>{const p=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';payerTotals[p]=(payerTotals[p]||0)+parseFloat(e.amount);});
   Object.keys(payerTotals).forEach(k=>{if(payerTotals[k]<=0)delete payerTotals[k];});
-  const payerColors={'Daniel':'#c87d00','Draw':'#0d47a1','Emilio':'#1a6b35','Manny':'#b71c1c'};
-  const payerRows=Object.entries(payerTotals).sort((a,b)=>b[1]-a[1]).map(([name,val])=>{
-    const pct=expTotal>0?((val/expTotal)*100).toFixed(1):0;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e8e8f0;font-size:12px"><span style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:${payerColors[name]||'#8892b0'};display:inline-block"></span><span style="font-family:'DM Mono',monospace">${name}</span><span style="font-family:'DM Mono',monospace;color:#8892b0;font-size:10px">${pct}%</span></span><span style="font-family:'DM Mono',monospace;font-weight:600;color:${payerColors[name]||'#8892b0'}">$${Math.round(val).toLocaleString('en-US')}</span></div>`;
-  }).join('');
 
   const cashRehabLedgerRow=cashRehabSpent>0?`<tr><td>&#x2212; Cash Rehab Spent <span style="font-size:10px;color:#8892b0">(out of pocket)</span></td><td class="neg">(${f(cashRehabSpent)})</td></tr>`:'';
   const overageLedgerRow=financedOverage>0?`<tr><td>&#x2212; Rehab Over Budget <span style="font-size:10px;color:#8892b0">(overage)</span></td><td class="neg">(${f(financedOverage)})</td></tr>`:'';
@@ -1733,9 +1728,21 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
       </div>
     </div>
   </div>
-  ${exps.length>0?`<div class="section">
-    <div class="section-header"><div class="section-num">04</div><div class="section-title">Rehab Expense Log (${exps.length} Entries)</div><div class="section-line"></div></div>
-    ${payerRows?`<div style="background:#f7f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:14px 18px;margin-bottom:16px"><div style="font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8892b0;margin-bottom:10px">Who the House Owes</div>${payerRows}<div style="font-size:10px;color:#8892b0;font-family:'DM Mono',monospace;margin-top:8px;font-style:italic">Draw = loan funded. Daniel, Emilio &amp; Manny = out-of-pocket, reimbursable from proceeds.</div></div>`:''}
+  ${exps.length>0?`
+  <div class="section">
+    <div class="section-header"><div class="section-num">04</div><div class="section-title">Who the House Owes — Before Net Proceeds Split</div><div class="section-line"></div></div>
+    <div style="background:#f7f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:16px 20px">
+      ${Object.entries(payerTotals).sort((a,b)=>b[1]-a[1]).map(([name,val])=>{
+        const pct=expTotal>0?((val/expTotal)*100).toFixed(1):0;
+        const col={'Daniel':'#c87d00','Draw':'#0d47a1','Emilio':'#1a6b35','Manny':'#b71c1c'}[name]||'#8892b0';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #e8e8f0;font-size:13px"><span style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:${col};display:inline-block"></span><span style="font-family:'DM Mono',monospace;font-weight:600">${name}</span><span style="font-family:'DM Mono',monospace;color:#8892b0;font-size:10px">${pct}%</span></span><span style="font-family:'DM Mono',monospace;font-weight:600;color:${col}">$${Math.round(val).toLocaleString('en-US')}</span></div>`;
+      }).join('')}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px;font-size:13px;font-weight:700"><span style="font-family:'DM Mono',monospace">TOTAL</span><span style="font-family:'DM Mono',monospace">$${Math.round(expTotal).toLocaleString('en-US')}</span></div>
+      <div style="font-size:10px;color:#8892b0;font-family:'DM Mono',monospace;margin-top:8px;font-style:italic">Draw = loan funded. Daniel, Emilio &amp; Manny = out-of-pocket, reimbursable from proceeds.</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-header"><div class="section-num">05</div><div class="section-title">Rehab Expense Log (${exps.length} Entries)</div><div class="section-line"></div></div>
     <table class="exp-table">
       <thead><tr><th>#</th><th>Date</th><th>Category</th><th>Contractor / Vendor</th><th>Description</th><th>Paid By</th><th style="text-align:right">Amount</th></tr></thead>
       <tbody>${expRows}</tbody>
