@@ -1060,7 +1060,7 @@ function renderExps(){
     const isCredit=parseFloat(e.amount)<0;
     const amtColor=isCredit?'var(--green)':'var(--red)';
     const amtDisplay=isCredit?'+ $'+Math.abs(parseFloat(e.amount)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'$'+parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const paidBy=e.paid_by||'Draw';
+    const paidBy=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
     const paidByColor=paidBy==='Draw'?'var(--blue)':paidBy==='Daniel'?'var(--gold)':paidBy==='Emilio'?'var(--green)':'var(--red)';
     const actionCol=isAdmin
       ?`<td style="text-align:center;white-space:nowrap">
@@ -1088,17 +1088,19 @@ function renderExps(){
 
 function renderPayerChart(expenses){
   const wrap=document.getElementById('payerChartWrap');
-  const positiveExps=expenses.filter(e=>parseFloat(e.amount)>0);
-  if(!positiveExps.length){wrap.style.display='none';return;}
+  if(!expenses.length){wrap.style.display='none';return;}
   wrap.style.display='block';
 
-  // Tally by payer (positive amounts only — credits don't count as "owed")
+  // Tally by payer — credits subtract from what the house owes them
   const colors={'Daniel':'#e8a020','Draw':'#4dabf7','Emilio':'#2dd36f','Manny':'#ff6b6b'};
   const totals={};
-  positiveExps.forEach(e=>{
-    const p=e.paid_by||'Draw';
+  expenses.forEach(e=>{
+    const p=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
     totals[p]=(totals[p]||0)+parseFloat(e.amount);
   });
+
+  // Remove anyone fully refunded (net zero or below)
+  Object.keys(totals).forEach(k=>{if(totals[k]<=0)delete totals[k];});
 
   // Sort descending
   const entries=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
@@ -1543,14 +1545,15 @@ function printReport(){
   const f=n=>'$'+Math.round(Math.abs(n)).toLocaleString('en-US');
   const f2=n=>n>=0?'+$'+Math.round(n).toLocaleString('en-US'):'-$'+Math.round(Math.abs(n)).toLocaleString('en-US');
   const expRows=exps.map((e,i)=>{
-    const pb=e.paid_by||'Draw';
+    const pb=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
     const pbColor=pb==='Draw'?'#0d47a1':pb==='Daniel'?'#c87d00':pb==='Emilio'?'#1a6b35':'#b71c1c';
     return `<tr><td>${i+1}</td><td>${e.date}</td><td>${e.category}</td><td>${e.vendor||'—'}</td><td>${e.description||'—'}</td><td style="color:${pbColor};font-weight:600;font-size:11px">${pb}</td><td style="text-align:right;font-weight:600">$${parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`;
   }).join('');
 
   // Payer breakdown for print
   const payerTotals={};
-  exps.filter(e=>parseFloat(e.amount)>0).forEach(e=>{const p=e.paid_by||'Draw';payerTotals[p]=(payerTotals[p]||0)+parseFloat(e.amount);});
+  exps.forEach(e=>{const p=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';payerTotals[p]=(payerTotals[p]||0)+parseFloat(e.amount);});
+  Object.keys(payerTotals).forEach(k=>{if(payerTotals[k]<=0)delete payerTotals[k];});
   const payerColors={'Daniel':'#c87d00','Draw':'#0d47a1','Emilio':'#1a6b35','Manny':'#b71c1c'};
   const payerRows=Object.entries(payerTotals).sort((a,b)=>b[1]-a[1]).map(([name,val])=>{
     const pct=expTotal>0?((val/expTotal)*100).toFixed(1):0;
