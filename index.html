@@ -331,10 +331,8 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             <div class="lrow"><span class="ll">&#x2212; Realtor Commission (<span id="l-realtor-pct">6</span>%)</span><span class="lv neg" id="l-realtor">—</span></div>
             <div class="lrow"><span class="ll">&#x2212; Closing Costs (<span id="l-closing-pct">2</span>%)</span><span class="lv neg" id="l-closing">—</span></div>
             <div class="lrow"><span class="ll">&#x2212; Investors Principal Returned</span><span class="lv neg" id="l-principal">—</span></div>
-            <!-- Cash rehab row — shown only when cash_rehab_budget > 0 and expenses exist -->
-            <div class="lrow" id="row-cash-rehab" style="display:none"><span class="ll">&#x2212; Cash Rehab Spent <span class="rehab-tag cash">out of pocket</span></span><span class="lv neg" id="l-cash-rehab">—</span></div>
-            <!-- Financed rehab overage — shown only when expenses exceed financed budget -->
-            <div class="lrow" id="row-rehab-overage" style="display:none"><span class="ll">&#x2212; Rehab Over Budget <span class="rehab-tag financed">overage</span></span><span class="lv neg" id="l-rehab-overage">—</span></div>
+            <!-- Partners owed — net sum of all non-Draw expenses -->
+            <div class="lrow" id="row-partners-owed" style="display:none"><span class="ll">&#x2212; Rehab Over Budget <span class="rehab-tag cash">partners owed</span></span><span class="lv neg" id="l-partners-owed">—</span></div>
             <div class="lrow" id="row-interest-all"><span class="ll" id="l-interest-label">&#x2212; Total Interest Paid</span><span class="lv neg" id="l-interest">—</span></div>
             <div class="lrow divider"><span class="ll">= Net Proceeds Pool</span><span class="lv big" id="l-net">—</span></div>
             <div class="lrow" style="border:none;padding-top:6px;padding-bottom:2px"><span class="ll" style="font-size:11px;color:var(--muted)">LTV</span><span class="lv" id="l-ltv" style="font-size:11px;color:var(--muted)">—</span></div>
@@ -374,8 +372,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             <div class="lrow"><span class="ll" style="font-size:12px">Earnest Money</span><span class="lv neg" style="font-size:12px" id="ov-earnest">—</span></div>
             <div class="lrow"><span class="ll" style="font-size:12px">Down Payment</span><span class="lv neg" style="font-size:12px" id="ov-down">—</span></div>
             <div class="lrow"><span class="ll" style="font-size:12px">Interest Paid to Date</span><span class="lv neg" style="font-size:12px" id="ov-int-paid">—</span></div>
-            <div class="lrow" id="ov-cash-rehab-row" style="display:none"><span class="ll" style="font-size:12px">Cash Rehab Spent</span><span class="lv neg" style="font-size:12px" id="ov-cash-rehab-amt">—</span></div>
-            <div class="lrow" id="ov-overage-row" style="display:none"><span class="ll" style="font-size:12px">Rehab Over Budget</span><span class="lv neg" style="font-size:12px" id="ov-overage-amt">—</span></div>
+            <div class="lrow" id="ov-partners-row" style="display:none"><span class="ll" style="font-size:12px">Partners Owed</span><span class="lv neg" style="font-size:12px" id="ov-partners-amt">—</span></div>
             <div class="lrow" style="border-top:2px solid var(--border2);padding-top:12px;margin-top:4px">
               <span class="ll" style="font-size:12px;color:var(--text);font-weight:600">Total Out of Pocket</span>
               <span class="lv" style="font-size:14px;color:var(--red)" id="ov-total-oop">—</span>
@@ -392,14 +389,8 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
           <div class="mstat"><div class="ms-lbl">Financed</div><div class="ms-val blue" id="r-financed">—</div></div>
           <div class="mstat"><div class="ms-lbl">Cash</div><div class="ms-val red" id="r-cash">—</div></div>
           <div class="mstat"><div class="ms-lbl">Logged</div><div class="ms-val red" id="r-spent">$0</div></div>
-          <div class="mstat"><div class="ms-lbl">Remaining</div><div class="ms-val" id="r-remaining">—</div></div>
-          <div class="mstat"><div class="ms-lbl">% Used</div><div class="ms-val" id="r-pct">0%</div></div>
-        </div>
-        <div class="panel" style="margin-bottom:20px">
-          <div class="pbar-wrap" style="margin-bottom:0">
-            <div class="pbar-head"><span>Budget Used</span><span id="r-bar-label">—</span></div>
-            <div class="pbar-bg" style="height:12px"><div class="pbar-fill gold" id="r-bar" style="width:0%"></div></div>
-          </div>
+          <div class="mstat"><div class="ms-lbl">Financed Budget Remaining</div><div class="ms-val green" id="r-remaining">—</div></div>
+          <div class="mstat"><div class="ms-lbl">% Draw Used</div><div class="ms-val" id="r-pct">0%</div></div>
         </div>
         <div class="form-panel">
           <div class="slabel">+ Log Expense</div>
@@ -887,10 +878,14 @@ function updateCalc(){
 
   const expTotal=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
 
-  // ── Rehab OOP logic ──
-  // Financed portion is in the loan payoff — only the spend BEYOND that hits proceeds
-  const cashRehabSpent=Math.max(0,Math.min(expTotal-rehabFinanced,cashRehabBudget));
-  const financedOverage=Math.max(0,expTotal-rehabFinanced-cashRehabBudget);
+  // ── New rehab logic ──
+  // Draw expenses = what loan funds actually paid (tracks against financed budget)
+  // Partners owed = net sum of non-Draw expenses (what house must reimburse from proceeds)
+  const normPayer=e=>(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
+  const drawTotal=exps.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
+  const partnersOwed=exps.reduce((s,e)=>normPayer(e)!=='Draw'?s+parseFloat(e.amount):s,0);
+  const financedRemaining=Math.max(0,rehabFinanced-drawTotal);
+  const drawPct=rehabFinanced>0?Math.min((drawTotal/rehabFinanced)*100,100):0;
 
   // HELOC interest
   const helocFunds=cur.heloc_amount!=null?cur.heloc_amount:principal;
@@ -905,13 +900,13 @@ function updateCalc(){
   const closing=arv*closingPct;
 
   // Interest now deducted from net proceeds — visible to all, funded by draws not investor pocket
-  const net=arv-payoff-realtor-closing-principal-cashRehabSpent-financedOverage-interest;
+  const net=arv-payoff-realtor-closing-principal-Math.max(0,partnersOwed)-interest;
   const share40=net>0?net*0.40:0;
   const profit=share40-helocInterest; // HELOC still SA only — personal financing
   const roi=principal>0?(profit/principal)*100:0;
   const ltv=arv>0?(payoff/arv)*100:0;
   const intPaid=monthly*months;
-  const totalOOP=principal+intPaid+helocInterest+cashRehabSpent+financedOverage;
+  const totalOOP=principal+intPaid+helocInterest+Math.max(0,partnersOwed);
 
   // Days held
   let daysHeld=null;
@@ -933,21 +928,13 @@ function updateCalc(){
   document.getElementById('l-principal').textContent=principal>0?'('+fmt(principal)+')':'—';
   document.getElementById('l-principal2').textContent=principal>0?fmt(principal):'—';
 
-  // Cash rehab row
-  const cashRehabRow=document.getElementById('row-cash-rehab');
-  const cashRehabEl=document.getElementById('l-cash-rehab');
-  if(cashRehabSpent>0){
-    cashRehabEl.textContent='('+fmt(cashRehabSpent)+')';
-    cashRehabRow.style.display='flex';
-  }else{cashRehabRow.style.display='none';}
-
-  // Overage row
-  const overageRow=document.getElementById('row-rehab-overage');
-  const overageEl=document.getElementById('l-rehab-overage');
-  if(financedOverage>0){
-    overageEl.textContent='('+fmt(financedOverage)+')';
-    overageRow.style.display='flex';
-  }else{overageRow.style.display='none';}
+  // Partners owed row
+  const partnersOwedRow=document.getElementById('row-partners-owed');
+  const partnersOwedEl=document.getElementById('l-partners-owed');
+  if(partnersOwed>0){
+    partnersOwedEl.textContent='('+fmt(partnersOwed)+')';
+    partnersOwedRow.style.display='flex';
+  }else{partnersOwedRow.style.display='none';}
 
   const intLabel=document.getElementById('l-interest-label');
   if(intLabel)intLabel.textContent='\u2212 Total Interest ('+months+' mo @ '+fmt(monthly)+'/mo)';
@@ -1003,17 +990,16 @@ function updateCalc(){
   else if(profit<-2000){vEl.className='verdict loss';vEl.textContent='\u25bc Losing Money';}
   else{vEl.className='verdict even';vEl.textContent='\u2248 Break Even';}
 
-  const be=(1-realtorPct-closingPct)>0?(payoff+principal+interest)/(1-realtorPct-closingPct):0;
+  const be=(1-realtorPct-closingPct)>0?(payoff+principal+interest+Math.max(0,partnersOwed))/(1-realtorPct-closingPct):0;
   document.getElementById('breakEven').textContent=be>0?fmt(Math.ceil(be/5000)*5000):'—';
 
   // ── Rehab Draw panel ──
-  const drawPct=totalBudget>0?Math.min((expTotal/totalBudget)*100,100):0;
   document.getElementById('ov-financed-budget').textContent=rehabFinanced>0?fmt(rehabFinanced):'—';
   document.getElementById('ov-cash-budget').textContent=cashRehabBudget>0?fmt(cashRehabBudget):'$0';
   document.getElementById('ov-total-budget').textContent=totalBudget>0?fmt(totalBudget):'—';
   document.getElementById('ov-logged').textContent=expTotal>0?fmt(expTotal):'$0';
-  document.getElementById('ov-draw-rem').textContent=totalBudget>0?fmt(Math.max(0,totalBudget-expTotal)):'—';
-  document.getElementById('ov-draw-used').textContent=totalBudget>0?fmt(expTotal)+' / '+fmt(totalBudget):'—';
+  document.getElementById('ov-draw-rem').textContent=fmt(financedRemaining);
+  document.getElementById('ov-draw-used').textContent=rehabFinanced>0?fmt(drawTotal)+' / '+fmt(rehabFinanced):'—';
   document.getElementById('ov-bar').style.width=drawPct+'%';
 
   // ── Break-even OOP panel ──
@@ -1021,15 +1007,10 @@ function updateCalc(){
   document.getElementById('ov-down').textContent=down>0?fmt(down):'—';
   document.getElementById('ov-int-paid').textContent=intPaid>0?fmt(intPaid)+' ('+months+' mo)':'—';
 
-  const cashRehabOopRow=document.getElementById('ov-cash-rehab-row');
-  const cashRehabOopAmt=document.getElementById('ov-cash-rehab-amt');
-  if(cashRehabSpent>0){cashRehabOopAmt.textContent=fmt(cashRehabSpent);cashRehabOopRow.style.display='flex';}
-  else{cashRehabOopRow.style.display='none';}
-
-  const overageOopRow=document.getElementById('ov-overage-row');
-  const overageOopAmt=document.getElementById('ov-overage-amt');
-  if(financedOverage>0){overageOopAmt.textContent=fmt(financedOverage);overageOopRow.style.display='flex';}
-  else{overageOopRow.style.display='none';}
+  const partnersOopRow=document.getElementById('ov-partners-row');
+  const partnersOopAmt=document.getElementById('ov-partners-amt');
+  if(partnersOwed>0){partnersOopAmt.textContent=fmt(partnersOwed);partnersOopRow.style.display='flex';}
+  else{partnersOopRow.style.display='none';}
 
   document.getElementById('ov-total-oop').textContent=totalOOP>0?fmt(totalOOP):'—';
 }
@@ -1049,19 +1030,17 @@ function renderExps(){
   const rehabFinanced=cur?.rehab_budget||0;
   const cashRehabBudget=cur?.cash_rehab_budget||0;
   const totalBudget=rehabFinanced+cashRehabBudget;
+  const normPayer=e=>(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
+  const drawTotal=exps.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
   const total=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
-  const rem=totalBudget-total;
-  const pct=totalBudget>0?Math.min((total/totalBudget)*100,100):0;
+  const financedRem=Math.max(0,rehabFinanced-drawTotal);
+  const pct=rehabFinanced>0?Math.min((drawTotal/rehabFinanced)*100,100):0;
   document.getElementById('r-budget').textContent=totalBudget>0?fmt(totalBudget):'—';
   document.getElementById('r-financed').textContent=rehabFinanced>0?fmt(rehabFinanced):'—';
   document.getElementById('r-cash').textContent=cashRehabBudget>0?fmt(cashRehabBudget):'$0';
   document.getElementById('r-spent').textContent=fmt(total);
-  document.getElementById('r-remaining').textContent=fmt(Math.max(0,rem));
+  document.getElementById('r-remaining').textContent=fmt(financedRem);
   document.getElementById('r-pct').textContent=pct.toFixed(1)+'%';
-  document.getElementById('r-bar-label').textContent=fmt(total)+' of '+fmt(totalBudget);
-  const bar=document.getElementById('r-bar');
-  bar.style.width=pct+'%';
-  bar.className='pbar-fill '+(pct>=90?'red':pct>=60?'gold':'green');
   const tbody=document.getElementById('expBody');
   tbody.innerHTML='';
   if(!exps.length){tbody.innerHTML='<tr class="empty-row"><td colspan="8">No expenses logged yet.</td></tr>';renderPayerChart([]);return;}
@@ -1548,16 +1527,18 @@ function printReport(){
   const realtor=arv*realtorPct;
   const closing=arv*closingPct;
   const expTotal=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
-  const cashRehabSpent=Math.max(0,Math.min(expTotal-rehabFinanced,cashRehabBudget));
-  const financedOverage=Math.max(0,expTotal-rehabFinanced-cashRehabBudget);
-  const net=arv-payoff-realtor-closing-principal-cashRehabSpent-financedOverage-interest;
+  const normPayer=e=>(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
+  const drawTotal=exps.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
+  const partnersOwed=exps.reduce((s,e)=>normPayer(e)!=='Draw'?s+parseFloat(e.amount):s,0);
+  const financedRemaining=Math.max(0,rehabFinanced-drawTotal);
+  const net=arv-payoff-realtor-closing-principal-Math.max(0,partnersOwed)-interest;
   const share40=net>0?net*0.40:0;
   const profit=share40; // HELOC handled separately for SA
   const roi=principal>0?(profit/principal)*100:0;
   const ltv=arv>0?(payoff/arv)*100:0;
   const intPaid=monthly*months;
-  const totalOOP=principal+intPaid+cashRehabSpent+financedOverage;
-  const be=(1-realtorPct-closingPct)>0?(payoff+principal+interest)/(1-realtorPct-closingPct):0;
+  const totalOOP=principal+intPaid+Math.max(0,partnersOwed);
+  const be=(1-realtorPct-closingPct)>0?(payoff+principal+interest+Math.max(0,partnersOwed))/(1-realtorPct-closingPct):0;
   const verdict=profit>5000?'PROJECTED PROFIT':profit<-2000?'PROJECTED LOSS':'NEAR BREAK-EVEN';
   const verdictColor=profit>5000?'#1a7a3e':profit<-2000?'#8b1a1a':'#7a5a00';
   const now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
@@ -1569,15 +1550,8 @@ function printReport(){
     return `<tr><td>${i+1}</td><td>${e.date}</td><td>${e.category}</td><td>${e.vendor||'—'}</td><td>${e.description||'—'}</td><td style="color:${pbColor};font-weight:600;font-size:11px">${pb}</td><td style="text-align:right;font-weight:600">$${parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`;
   }).join('');
 
-  // Payer breakdown for print
-  const payerTotals={};
-  exps.forEach(e=>{const p=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';payerTotals[p]=(payerTotals[p]||0)+parseFloat(e.amount);});
-  Object.keys(payerTotals).forEach(k=>{if(payerTotals[k]<=0)delete payerTotals[k];});
-
-  const cashRehabLedgerRow=cashRehabSpent>0?`<tr><td>&#x2212; Cash Rehab Spent <span style="font-size:10px;color:#8892b0">(out of pocket)</span></td><td class="neg">(${f(cashRehabSpent)})</td></tr>`:'';
-  const overageLedgerRow=financedOverage>0?`<tr><td>&#x2212; Rehab Over Budget <span style="font-size:10px;color:#8892b0">(overage)</span></td><td class="neg">(${f(financedOverage)})</td></tr>`:'';
-  const cashRehabOOPRow=cashRehabSpent>0?`<div class="info-row"><span class="info-label">Cash Rehab Spent</span><span class="info-val neg">(${f(cashRehabSpent)})</span></div>`:'';
-  const overageOOPRow=financedOverage>0?`<div class="info-row"><span class="info-label">Rehab Over Budget</span><span class="info-val neg">(${f(financedOverage)})</span></div>`:'';
+  const partnersLedgerRow=partnersOwed>0?`<tr><td>&#x2212; Rehab Over Budget <span style="font-size:10px;color:#8892b0">(partners owed)</span></td><td class="neg">(${f(partnersOwed)})</td></tr>`:'';
+  const partnersOOPRow=partnersOwed>0?`<div class="info-row"><span class="info-label">Partners Owed</span><span class="info-val neg">(${f(partnersOwed)})</span></div>`:'';
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Investment Report — ${cur.address}</title>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@400;500&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -1690,8 +1664,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
       <tr><td>&#x2212; Realtor Commission (${cur.realtor_commission!=null?cur.realtor_commission:6}%)</td><td class="neg">(${f(realtor)})</td></tr>
       <tr><td>&#x2212; Closing Costs (${cur.closing_costs_pct!=null?cur.closing_costs_pct:2}%)</td><td class="neg">(${f(closing)})</td></tr>
       <tr><td>&#x2212; Investors Principal Returned</td><td class="neg">(${f(principal)})</td></tr>
-      ${cashRehabLedgerRow}
-      ${overageLedgerRow}
+      ${partnersLedgerRow}
       <tr><td>&#x2212; Total Interest (${months} mo @ ${f(monthly)}/mo)</td><td class="neg">(${f(interest)})</td></tr>
       <tr class="subtotal"><td>= Net Proceeds Pool</td><td class="${net>=0?'pos':'neg'}">${net>=0?f(net):'-'+f(Math.abs(net))}</td></tr>
       ${isSuperAdmin?`
@@ -1701,7 +1674,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
       <tr><td style="color:#8892b0;font-size:12px">ROI on Your Cash</td><td style="font-family:'DM Mono',monospace;color:${roi>=0?'#1a6b35':'#b71c1c'};font-size:14px">${roi.toFixed(1)}%</td></tr>
       `:''}
     </table>
-    <div style="margin-top:14px;padding:12px 14px;background:#f7f8fc;border-left:3px solid #e8a020;font-size:11px;color:#5a6080;font-family:'DM Mono',monospace;line-height:1.7">* Estimates only. Financed rehab is baked into the loan payoff and not separately deducted. Only cash rehab spent and any overage beyond budget are deducted from proceeds.${isSuperAdmin?' 40% equity share per agreement with Tampa Bay Cash Buyers LLC.':''}</div>
+    <div style="margin-top:14px;padding:12px 14px;background:#f7f8fc;border-left:3px solid #e8a020;font-size:11px;color:#5a6080;font-family:'DM Mono',monospace;line-height:1.7">* Estimates only. Financed rehab is baked into the loan payoff. Partners Owed = net sum of non-Draw expenses reimbursable from proceeds.${isSuperAdmin?' 40% equity share per agreement with Tampa Bay Cash Buyers LLC.':''}</div>
   </div>
   <div class="section">
     <div class="section-header"><div class="section-num">03</div><div class="section-title">Cash Position &amp; Break-Even Analysis</div><div class="section-line"></div></div>
@@ -1711,8 +1684,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
         <div class="info-row"><span class="info-label">Earnest Money</span><span class="info-val neg">(${f(earnest)})</span></div>
         <div class="info-row"><span class="info-label">Down Payment</span><span class="info-val neg">(${f(down)})</span></div>
         <div class="info-row"><span class="info-label">Interest Paid (${months} mo)</span><span class="info-val neg">(${f(intPaid)})</span></div>
-        ${cashRehabOOPRow}
-        ${overageOOPRow}
+        ${partnersOOPRow}
         <div class="info-row" style="border-top:2px solid #1a1a2e;margin-top:4px;padding-top:12px"><span class="info-label" style="font-weight:600;color:#1a1a2e">Total Out of Pocket</span><span class="info-val neg" style="font-size:14px">(${f(totalOOP)})</span></div>
       </div>
       <div>
@@ -1722,8 +1694,8 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
           <div class="info-row"><span class="info-label">Financed (in loan)</span><span class="info-val blue">${f(rehabFinanced)}</span></div>
           <div class="info-row"><span class="info-label">Cash (out of pocket)</span><span class="info-val red">${f(cashRehabBudget)}</span></div>
           <div class="info-row"><span class="info-label" style="font-weight:600">Total Budget</span><span class="info-val gold">${f(totalBudget)}</span></div>
-          <div class="pbar-wrap" style="margin-top:10px"><div class="pbar-header"><span>Draws Used</span><span>${f(expTotal)} of ${f(totalBudget)}</span></div><div class="pbar-bg"><div class="pbar-fill ${expTotal/totalBudget<0.6?'green':''}" style="width:${totalBudget>0?Math.min(expTotal/totalBudget*100,100).toFixed(0):0}%"></div></div></div>
-          <div class="info-row"><span class="info-label">Remaining</span><span class="info-val green">${f(Math.max(0,totalBudget-expTotal))}</span></div>
+          <div class="info-row"><span class="info-label">Draw Used</span><span class="info-val blue">${f(drawTotal)}</span></div>
+          <div class="info-row"><span class="info-label">Financed Budget Remaining</span><span class="info-val green">${f(financedRemaining)}</span></div>
         </div>
       </div>
     </div>
@@ -1732,12 +1704,18 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
   <div class="section">
     <div class="section-header"><div class="section-num">04</div><div class="section-title">Who the House Owes — Before Net Proceeds Split</div><div class="section-line"></div></div>
     <div style="background:#f7f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:16px 20px">
-      ${Object.entries(payerTotals).sort((a,b)=>b[1]-a[1]).map(([name,val])=>{
-        const pct=expTotal>0?((val/expTotal)*100).toFixed(1):0;
-        const col={'Daniel':'#c87d00','Draw':'#0d47a1','Emilio':'#1a6b35','Manny':'#b71c1c'}[name]||'#8892b0';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #e8e8f0;font-size:13px"><span style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:${col};display:inline-block"></span><span style="font-family:'DM Mono',monospace;font-weight:600">${name}</span><span style="font-family:'DM Mono',monospace;color:#8892b0;font-size:10px">${pct}%</span></span><span style="font-family:'DM Mono',monospace;font-weight:600;color:${col}">$${Math.round(val).toLocaleString('en-US')}</span></div>`;
-      }).join('')}
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px;font-size:13px;font-weight:700"><span style="font-family:'DM Mono',monospace">TOTAL</span><span style="font-family:'DM Mono',monospace">$${Math.round(expTotal).toLocaleString('en-US')}</span></div>
+      ${(()=>{
+        const pt={};
+        exps.forEach(e=>{const p=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';pt[p]=(pt[p]||0)+parseFloat(e.amount);});
+        Object.keys(pt).forEach(k=>{if(pt[k]<=0)delete pt[k];});
+        const grandTotal=Object.values(pt).reduce((s,v)=>s+v,0);
+        const colMap={'Daniel':'#c87d00','Draw':'#0d47a1','Emilio':'#1a6b35','Manny':'#b71c1c'};
+        return Object.entries(pt).sort((a,b)=>b[1]-a[1]).map(([name,val])=>{
+          const pct=grandTotal>0?((val/grandTotal)*100).toFixed(1):0;
+          const col=colMap[name]||'#8892b0';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #e8e8f0;font-size:13px"><span style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:${col};display:inline-block"></span><span style="font-family:'DM Mono',monospace;font-weight:600">${name}</span><span style="font-family:'DM Mono',monospace;color:#8892b0;font-size:10px">${pct}%</span></span><span style="font-family:'DM Mono',monospace;font-weight:600;color:${col}">$${Math.round(val).toLocaleString('en-US')}</span></div>`;
+        }).join('')+`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px;font-size:13px;font-weight:700"><span style="font-family:'DM Mono',monospace">TOTAL</span><span style="font-family:'DM Mono',monospace">$${Math.round(grandTotal).toLocaleString('en-US')}</span></div>`;
+      })()}
       <div style="font-size:10px;color:#8892b0;font-family:'DM Mono',monospace;margin-top:8px;font-style:italic">Draw = loan funded. Daniel, Emilio &amp; Manny = out-of-pocket, reimbursable from proceeds.</div>
     </div>
   </div>
