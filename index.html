@@ -130,7 +130,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
 .ms-val{font-family:var(--mono);font-size:16px;color:var(--text)}
 .ms-val.gold{color:var(--gold)}.ms-val.red{color:var(--red)}.ms-val.green{color:var(--green)}
 .form-panel{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px}
-.form-grid{display:grid;grid-template-columns:150px 160px 1fr 1fr 110px auto;gap:10px;align-items:end}
+.form-grid{display:grid;grid-template-columns:150px 160px 1fr 1fr 130px 110px auto;gap:10px;align-items:end}
 @media(max-width:800px){.form-grid{grid-template-columns:1fr 1fr}}
 .fld label{display:block;font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
 .fld input,.fld select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:13px;padding:9px 12px;outline:none;transition:border-color .2s}
@@ -197,6 +197,22 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
 .rehab-tag{display:inline-block;font-size:9px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:3px;margin-left:6px}
 .rehab-tag.financed{background:var(--blue-dim);color:var(--blue)}
 .rehab-tag.cash{background:var(--red-dim);color:var(--red)}
+/* Payer chart */
+.payer-chart-wrap{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;display:none}
+.payer-chart-inner{display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.payer-donut{position:relative;width:120px;height:120px;flex-shrink:0}
+.payer-donut svg{transform:rotate(-90deg)}
+.payer-donut-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono)}
+.payer-donut-label .payer-total-val{font-size:14px;color:var(--text);font-weight:500}
+.payer-donut-label .payer-total-lbl{font-size:9px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+.payer-legend{flex:1;min-width:180px}
+.payer-legend-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;font-family:var(--mono)}
+.payer-legend-row:last-child{border-bottom:none}
+.payer-legend-left{display:flex;align-items:center;gap:8px}
+.payer-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.payer-name{color:var(--text)}
+.payer-pct{color:var(--muted);font-size:10px;margin-left:4px}
+.payer-amt{color:var(--gold);font-size:12px}
 </style>
 </head>
 <body>
@@ -400,8 +416,27 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             </div>
             <div class="fld"><label>Contractor / Vendor</label><input type="text" id="eVendor" placeholder="Name"></div>
             <div class="fld"><label>Description</label><input type="text" id="eDesc" placeholder="What was done"></div>
+            <div class="fld">
+              <label>Paid By</label>
+              <select id="ePaidBy">
+                <option value="House">House</option>
+                <option value="Dan">Dan</option>
+                <option value="TBCB">TBCB</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
             <div class="fld"><label>Amount ($)</label><input type="number" id="eAmount" placeholder="0.00" step="0.01"></div>
             <div class="fld"><label>&nbsp;</label><button class="btn btn-gold" style="width:100%;height:38px" onclick="addExpense()">Add</button></div>
+          </div>
+        </div>
+        <div class="payer-chart-wrap" id="payerChartWrap">
+          <div class="panel-title" style="margin-bottom:14px">Who the House Owes &nbsp;<span style="font-size:9px;color:var(--muted);letter-spacing:.06em">BEFORE NET PROCEEDS SPLIT</span></div>
+          <div class="payer-chart-inner">
+            <div class="payer-donut" id="payerDonut">
+              <svg width="120" height="120" viewBox="0 0 120 120" id="payerSvg"></svg>
+              <div class="payer-donut-label"><div class="payer-total-val" id="payerTotalVal">—</div><div class="payer-total-lbl">Total</div></div>
+            </div>
+            <div class="payer-legend" id="payerLegend"></div>
           </div>
         </div>
         <div class="etable-wrap">
@@ -414,8 +449,8 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             </div>
           </div>
           <table>
-            <thead><tr><th>#</th><th>Date</th><th>Category</th><th>Contractor/Vendor</th><th>Description</th><th style="text-align:right">Amount</th><th></th></tr></thead>
-            <tbody id="expBody"><tr class="empty-row"><td colspan="7">No expenses logged yet.</td></tr></tbody>
+            <thead><tr><th>#</th><th>Date</th><th>Category</th><th>Contractor/Vendor</th><th>Description</th><th>Paid By</th><th style="text-align:right">Amount</th><th></th></tr></thead>
+            <tbody id="expBody"><tr class="empty-row"><td colspan="8">No expenses logged yet.</td></tr></tbody>
           </table>
         </div>
       </div><!-- /tab-rehab -->
@@ -1020,11 +1055,13 @@ function renderExps(){
   bar.className='pbar-fill '+(pct>=90?'red':pct>=60?'gold':'green');
   const tbody=document.getElementById('expBody');
   tbody.innerHTML='';
-  if(!exps.length){tbody.innerHTML='<tr class="empty-row"><td colspan="7">No expenses logged yet.</td></tr>';return;}
+  if(!exps.length){tbody.innerHTML='<tr class="empty-row"><td colspan="8">No expenses logged yet.</td></tr>';renderPayerChart([]);return;}
   exps.forEach((e,i)=>{
     const isCredit=parseFloat(e.amount)<0;
     const amtColor=isCredit?'var(--green)':'var(--red)';
     const amtDisplay=isCredit?'+ $'+Math.abs(parseFloat(e.amount)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'$'+parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const paidBy=e.paid_by||'House';
+    const paidByColor=paidBy==='House'?'var(--muted2)':paidBy==='Dan'?'var(--gold)':paidBy==='TBCB'?'var(--blue)':'var(--green)';
     const actionCol=isAdmin
       ?`<td style="text-align:center;white-space:nowrap">
           ${isSuperAdmin?`<button class="del-btn" style="color:var(--gold);font-size:13px;margin-right:4px" onclick="editExp('${e.id}')">&#x270e;</button>`:''}
@@ -1039,12 +1076,83 @@ function renderExps(){
       <td><span class="badge bg-${catColor(e.category)}">${e.category}</span></td>
       <td>${e.vendor||'—'}</td>
       <td style="color:var(--muted2)">${e.description||'—'}</td>
+      <td style="color:${paidByColor};font-size:11px;letter-spacing:.06em;text-transform:uppercase">${paidBy}</td>
       <td style="text-align:right;color:${amtColor}">${amtDisplay}</td>
       ${actionCol}
     `;
     tbody.appendChild(tr);
   });
+  renderPayerChart(exps);
   updateCalc();
+}
+
+function renderPayerChart(expenses){
+  const wrap=document.getElementById('payerChartWrap');
+  const positiveExps=expenses.filter(e=>parseFloat(e.amount)>0);
+  if(!positiveExps.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+
+  // Tally by payer (positive amounts only — credits don't count as "owed")
+  const colors={'House':'#5a6080','Dan':'#e8a020','TBCB':'#4dabf7','Other':'#2dd36f'};
+  const totals={};
+  positiveExps.forEach(e=>{
+    const p=e.paid_by||'House';
+    totals[p]=(totals[p]||0)+parseFloat(e.amount);
+  });
+
+  // Sort descending
+  const entries=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const grand=entries.reduce((s,e)=>s+e[1],0);
+
+  // Update center label
+  document.getElementById('payerTotalVal').textContent='$'+Math.round(grand).toLocaleString('en-US');
+
+  // Build SVG donut
+  const svg=document.getElementById('payerSvg');
+  svg.innerHTML='';
+  const cx=60,cy=60,r=48,stroke=14;
+  const circumference=2*Math.PI*r;
+  let offset=0;
+  entries.forEach(([name,val])=>{
+    const pct=val/grand;
+    const dash=pct*circumference;
+    const gap=circumference-dash;
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);circle.setAttribute('r',r);
+    circle.setAttribute('fill','none');
+    circle.setAttribute('stroke',colors[name]||'#5a6080');
+    circle.setAttribute('stroke-width',stroke);
+    circle.setAttribute('stroke-dasharray',`${dash} ${gap}`);
+    circle.setAttribute('stroke-dashoffset',-offset);
+    circle.style.transition='stroke-dashoffset .4s ease';
+    svg.appendChild(circle);
+    offset+=dash;
+  });
+
+  // Build legend
+  const legend=document.getElementById('payerLegend');
+  legend.innerHTML='';
+  entries.forEach(([name,val])=>{
+    const pct=grand>0?((val/grand)*100).toFixed(1):0;
+    const row=document.createElement('div');
+    row.className='payer-legend-row';
+    row.innerHTML=`
+      <div class="payer-legend-left">
+        <div class="payer-dot" style="background:${colors[name]||'#5a6080'}"></div>
+        <span class="payer-name">${name}</span><span class="payer-pct">${pct}%</span>
+      </div>
+      <span class="payer-amt">$${Math.round(val).toLocaleString('en-US')}</span>
+    `;
+    legend.appendChild(row);
+  });
+
+  // House row gets a note
+  if(totals['House']){
+    const note=document.createElement('div');
+    note.style.cssText='font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:10px;line-height:1.6;font-style:italic';
+    note.textContent='House = funded from draws/loan. Dan & TBCB = out-of-pocket, reimbursable from proceeds.';
+    legend.appendChild(note);
+  }
 }
 
 async function addExpense(){
@@ -1054,9 +1162,10 @@ async function addExpense(){
   const cat=document.getElementById('eCat').value;
   const vendor=document.getElementById('eVendor').value.trim();
   const desc=document.getElementById('eDesc').value.trim();
+  const paidBy=document.getElementById('ePaidBy').value;
   const amount=parseFloat(document.getElementById('eAmount').value);
   if(!date||isNaN(amount)||amount===0){toast('Date and amount required','err');return;}
-  const {data,error}=await sb.from('expenses').insert([{property_id:cur.id,date,category:cat,vendor,description:desc,amount}]).select();
+  const {data,error}=await sb.from('expenses').insert([{property_id:cur.id,date,category:cat,vendor,description:desc,amount,paid_by:paidBy}]).select();
   if(error){toast('Error: '+error.message,'err');return;}
   exps.unshift(data[0]);
   renderExps();
@@ -1083,6 +1192,7 @@ function editExp(id){
   const existing=document.getElementById('editExpModal');
   if(existing)existing.remove();
   const cats=['Labor','Materials','Permits','Plumbing','Electrical','HVAC','Roofing','Flooring','Paint','Draw Fee','Inspection','Other'];
+  const payers=['House','Dan','TBCB','Other'];
   const overlay=document.createElement('div');
   overlay.className='modal-overlay open';overlay.id='editExpModal';
   overlay.innerHTML=`
@@ -1094,7 +1204,10 @@ function editExp(id){
           <select id="ee-cat">${cats.map(c=>`<option${c===e.category?' selected':''}>${c}</option>`).join('')}</select>
         </div>
         <div class="mf"><label>Contractor / Vendor</label><input type="text" id="ee-vendor" value="${e.vendor||''}"></div>
-        <div class="mf"><label>Description</label><input type="text" id="ee-desc" value="${e.description||''}"></div>
+        <div class="mf"><label>Paid By</label>
+          <select id="ee-paidby">${payers.map(p=>`<option${p===(e.paid_by||'House')?' selected':''}>${p}</option>`).join('')}</select>
+        </div>
+        <div class="mf full"><label>Description</label><input type="text" id="ee-desc" value="${e.description||''}"></div>
         <div class="mf full"><label>Amount ($) — use negative for credits</label><input type="number" id="ee-amount" value="${e.amount}" step="0.01"></div>
       </div>
       <div class="modal-actions">
@@ -1112,12 +1225,13 @@ async function saveEditExp(id){
   const category=document.getElementById('ee-cat').value;
   const vendor=document.getElementById('ee-vendor').value.trim();
   const description=document.getElementById('ee-desc').value.trim();
+  const paid_by=document.getElementById('ee-paidby').value;
   const amount=parseFloat(document.getElementById('ee-amount').value);
   if(!date||isNaN(amount)||amount===0){toast('Date and amount required','err');return;}
-  const {error}=await sb.from('expenses').update({date,category,vendor,description,amount}).eq('id',id);
+  const {error}=await sb.from('expenses').update({date,category,vendor,description,amount,paid_by}).eq('id',id);
   if(error){toast('Save failed: '+error.message,'err');return;}
   const idx=exps.findIndex(x=>x.id===id);
-  if(idx>-1)exps[idx]={...exps[idx],date,category,vendor,description,amount};
+  if(idx>-1)exps[idx]={...exps[idx],date,category,vendor,description,amount,paid_by};
   document.getElementById('editExpModal').remove();
   renderExps();
   toast('Expense updated');
@@ -1125,8 +1239,8 @@ async function saveEditExp(id){
 
 function exportCSV(){
   if(!exps.length){toast('Nothing to export','err');return;}
-  const rows=[['#','Date','Category','Vendor','Description','Amount']];
-  exps.forEach((e,i)=>rows.push([i+1,e.date,e.category,e.vendor||'',e.description||'',parseFloat(e.amount).toFixed(2)]));
+  const rows=[['#','Date','Category','Vendor','Description','Paid By','Amount']];
+  exps.forEach((e,i)=>rows.push([i+1,e.date,e.category,e.vendor||'',e.description||'',e.paid_by||'House',parseFloat(e.amount).toFixed(2)]));
   const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
@@ -1154,8 +1268,9 @@ function parseCsvForImport(text){
   if(lines.length<2){toast('CSV is empty or has no data rows','err');return;}
   const header=lines[0].split(',').map(h=>h.replace(/"/g,'').trim().toLowerCase());
   const col=name=>header.findIndex(h=>h.includes(name));
-  const iDate=col('date'),iCat=col('cat'),iVendor=col('vendor'),iDesc=col('desc'),iAmt=col('amount');
+  const iDate=col('date'),iCat=col('cat'),iVendor=col('vendor'),iDesc=col('desc'),iAmt=col('amount'),iPaid=col('paid');
   if(iDate===-1||iAmt===-1){toast('CSV must have at least Date and Amount columns','err');return;}
+  const validPayers=['House','Dan','TBCB','Other'];
   const rows=[];
   for(let i=1;i<lines.length;i++){
     const parts=lines[i].match(/(".*?"|[^,]+)(?=,|$)/g)||lines[i].split(',');
@@ -1165,6 +1280,8 @@ function parseCsvForImport(text){
     const catRaw=iCat>-1?clean(parts[iCat]||''):'Other';
     const vendor=iVendor>-1?clean(parts[iVendor]||''):'';
     const desc=iDesc>-1?clean(parts[iDesc]||''):'';
+    const paidRaw=iPaid>-1?clean(parts[iPaid]||''):'House';
+    const paid_by=validPayers.find(p=>p.toLowerCase()===paidRaw.toLowerCase())||'House';
     let date=dateRaw;
     if(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(dateRaw)){
       const p=dateRaw.split(/[\/\-]/);
@@ -1176,7 +1293,7 @@ function parseCsvForImport(text){
     if(isNaN(amtRaw)||amtRaw<=0)errors.push('Invalid amount');
     const isDup=exps.some(ex=>ex.date===date&&Math.abs(parseFloat(ex.amount)-amtRaw)<0.01&&(ex.vendor||'').toLowerCase()===(vendor||'').toLowerCase()&&(ex.description||'').toLowerCase()===(desc||'').toLowerCase());
     if(isDup)errors.push('Duplicate');
-    rows.push({date,category,vendor,desc,amount:amtRaw,errors,isDup,_valid:errors.length===0});
+    rows.push({date,category,vendor,desc,amount:amtRaw,paid_by,errors,isDup,_valid:errors.length===0});
   }
   _csvPendingRows=rows;
   showCsvPreview(rows);
@@ -1191,7 +1308,7 @@ function showCsvPreview(rows){
     `<span style="color:var(--red)">${dups} duplicate${dups!==1?'s':''} skipped</span> &nbsp;&middot;&nbsp; `+
     `<span style="color:var(--muted)">${invalid} invalid row${invalid!==1?'s':''} skipped</span>`;
   const head=document.getElementById('csvPreviewHead');
-  head.innerHTML='<th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">STATUS</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">DATE</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">CATEGORY</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">VENDOR</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">DESCRIPTION</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em;text-align:right">AMOUNT</th>';
+  head.innerHTML='<th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">STATUS</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">DATE</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">CATEGORY</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">VENDOR</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">DESCRIPTION</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em">PAID BY</th><th style="padding:6px 10px;color:var(--muted);font-size:10px;letter-spacing:.08em;text-align:right">AMOUNT</th>';
   const tbody=document.getElementById('csvPreviewBody');
   tbody.innerHTML='';
   rows.forEach(r=>{
@@ -1206,6 +1323,7 @@ function showCsvPreview(rows){
       <td style="padding:6px 10px">${r.category}</td>
       <td style="padding:6px 10px">${r.vendor||'—'}</td>
       <td style="padding:6px 10px;color:var(--muted2)">${r.desc||'—'}</td>
+      <td style="padding:6px 10px;color:var(--muted2)">${r.paid_by||'House'}</td>
       <td style="padding:6px 10px;text-align:right;color:var(--red)">${amtDisplay}</td>
     `;
     tbody.appendChild(tr);
@@ -1217,7 +1335,7 @@ function showCsvPreview(rows){
 
 async function commitCsvImport(){
   if(!isAdmin)return;
-  const toInsert=_csvPendingRows.filter(r=>r._valid).map(r=>({property_id:cur.id,date:r.date,category:r.category,vendor:r.vendor,description:r.desc,amount:r.amount}));
+  const toInsert=_csvPendingRows.filter(r=>r._valid).map(r=>({property_id:cur.id,date:r.date,category:r.category,vendor:r.vendor,description:r.desc,amount:r.amount,paid_by:r.paid_by||'House'}));
   if(!toInsert.length){toast('Nothing to import','err');return;}
   const btn=document.getElementById('csvImportBtn');
   btn.textContent='Importing...';btn.disabled=true;
@@ -1424,7 +1542,20 @@ function printReport(){
   const now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
   const f=n=>'$'+Math.round(Math.abs(n)).toLocaleString('en-US');
   const f2=n=>n>=0?'+$'+Math.round(n).toLocaleString('en-US'):'-$'+Math.round(Math.abs(n)).toLocaleString('en-US');
-  const expRows=exps.map((e,i)=>`<tr><td>${i+1}</td><td>${e.date}</td><td>${e.category}</td><td>${e.vendor||'—'}</td><td>${e.description||'—'}</td><td style="text-align:right;font-weight:600">$${parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`).join('');
+  const expRows=exps.map((e,i)=>{
+    const pb=e.paid_by||'House';
+    const pbColor=pb==='House'?'#8892b0':pb==='Dan'?'#c87d00':pb==='TBCB'?'#0d47a1':'#1a6b35';
+    return `<tr><td>${i+1}</td><td>${e.date}</td><td>${e.category}</td><td>${e.vendor||'—'}</td><td>${e.description||'—'}</td><td style="color:${pbColor};font-weight:600;font-size:11px">${pb}</td><td style="text-align:right;font-weight:600">$${parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`;
+  }).join('');
+
+  // Payer breakdown for print
+  const payerTotals={};
+  exps.filter(e=>parseFloat(e.amount)>0).forEach(e=>{const p=e.paid_by||'House';payerTotals[p]=(payerTotals[p]||0)+parseFloat(e.amount);});
+  const payerColors={'House':'#8892b0','Dan':'#c87d00','TBCB':'#0d47a1','Other':'#1a6b35'};
+  const payerRows=Object.entries(payerTotals).sort((a,b)=>b[1]-a[1]).map(([name,val])=>{
+    const pct=expTotal>0?((val/expTotal)*100).toFixed(1):0;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e8e8f0;font-size:12px"><span style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:${payerColors[name]||'#8892b0'};display:inline-block"></span><span style="font-family:'DM Mono',monospace">${name}</span><span style="font-family:'DM Mono',monospace;color:#8892b0;font-size:10px">${pct}%</span></span><span style="font-family:'DM Mono',monospace;font-weight:600;color:${payerColors[name]||'#8892b0'}">$${Math.round(val).toLocaleString('en-US')}</span></div>`;
+  }).join('');
 
   const cashRehabLedgerRow=cashRehabSpent>0?`<tr><td>&#x2212; Cash Rehab Spent <span style="font-size:10px;color:#8892b0">(out of pocket)</span></td><td class="neg">(${f(cashRehabSpent)})</td></tr>`:'';
   const overageLedgerRow=financedOverage>0?`<tr><td>&#x2212; Rehab Over Budget <span style="font-size:10px;color:#8892b0">(overage)</span></td><td class="neg">(${f(financedOverage)})</td></tr>`:'';
@@ -1582,10 +1713,11 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
   </div>
   ${exps.length>0?`<div class="section">
     <div class="section-header"><div class="section-num">04</div><div class="section-title">Rehab Expense Log (${exps.length} Entries)</div><div class="section-line"></div></div>
+    ${payerRows?`<div style="background:#f7f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:14px 18px;margin-bottom:16px"><div style="font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8892b0;margin-bottom:10px">Who the House Owes</div>${payerRows}<div style="font-size:10px;color:#8892b0;font-family:'DM Mono',monospace;margin-top:8px;font-style:italic">House = draw/loan funded. Dan & TBCB = out-of-pocket, reimbursable from proceeds.</div></div>`:''}
     <table class="exp-table">
-      <thead><tr><th>#</th><th>Date</th><th>Category</th><th>Contractor / Vendor</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+      <thead><tr><th>#</th><th>Date</th><th>Category</th><th>Contractor / Vendor</th><th>Description</th><th>Paid By</th><th style="text-align:right">Amount</th></tr></thead>
       <tbody>${expRows}</tbody>
-      <tfoot><tr><td colspan="5">TOTAL LOGGED EXPENSES</td><td style="text-align:right">$${expTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr></tfoot>
+      <tfoot><tr><td colspan="6">TOTAL LOGGED EXPENSES</td><td style="text-align:right">$${expTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr></tfoot>
     </table>
   </div>`:''}
 </div>
