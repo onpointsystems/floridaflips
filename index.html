@@ -419,10 +419,10 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             <div class="fld">
               <label>Paid By</label>
               <select id="ePaidBy">
-                <option value="House">House</option>
-                <option value="Dan">Dan</option>
-                <option value="TBCB">TBCB</option>
-                <option value="Other">Other</option>
+                <option value="Daniel">Daniel</option>
+                <option value="Draw" selected>Draw</option>
+                <option value="Emilio">Emilio</option>
+                <option value="Manny">Manny</option>
               </select>
             </div>
             <div class="fld"><label>Amount ($)</label><input type="number" id="eAmount" placeholder="0.00" step="0.01"></div>
@@ -1060,8 +1060,8 @@ function renderExps(){
     const isCredit=parseFloat(e.amount)<0;
     const amtColor=isCredit?'var(--green)':'var(--red)';
     const amtDisplay=isCredit?'+ $'+Math.abs(parseFloat(e.amount)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'$'+parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-    const paidBy=e.paid_by||'House';
-    const paidByColor=paidBy==='House'?'var(--muted2)':paidBy==='Dan'?'var(--gold)':paidBy==='TBCB'?'var(--blue)':'var(--green)';
+    const paidBy=e.paid_by||'Draw';
+    const paidByColor=paidBy==='Draw'?'var(--blue)':paidBy==='Daniel'?'var(--gold)':paidBy==='Emilio'?'var(--green)':'var(--red)';
     const actionCol=isAdmin
       ?`<td style="text-align:center;white-space:nowrap">
           ${isSuperAdmin?`<button class="del-btn" style="color:var(--gold);font-size:13px;margin-right:4px" onclick="editExp('${e.id}')">&#x270e;</button>`:''}
@@ -1093,10 +1093,10 @@ function renderPayerChart(expenses){
   wrap.style.display='block';
 
   // Tally by payer (positive amounts only — credits don't count as "owed")
-  const colors={'House':'#5a6080','Dan':'#e8a020','TBCB':'#4dabf7','Other':'#2dd36f'};
+  const colors={'Daniel':'#e8a020','Draw':'#4dabf7','Emilio':'#2dd36f','Manny':'#ff6b6b'};
   const totals={};
   positiveExps.forEach(e=>{
-    const p=e.paid_by||'House';
+    const p=e.paid_by||'Draw';
     totals[p]=(totals[p]||0)+parseFloat(e.amount);
   });
 
@@ -1147,10 +1147,10 @@ function renderPayerChart(expenses){
   });
 
   // House row gets a note
-  if(totals['House']){
+  if(entries.length){
     const note=document.createElement('div');
     note.style.cssText='font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:10px;line-height:1.6;font-style:italic';
-    note.textContent='House = funded from draws/loan. Dan & TBCB = out-of-pocket, reimbursable from proceeds.';
+    note.textContent='Draw = funded from loan draws. Daniel, Emilio & Manny = out-of-pocket, reimbursable from proceeds.';
     legend.appendChild(note);
   }
 }
@@ -1192,7 +1192,7 @@ function editExp(id){
   const existing=document.getElementById('editExpModal');
   if(existing)existing.remove();
   const cats=['Labor','Materials','Permits','Plumbing','Electrical','HVAC','Roofing','Flooring','Paint','Draw Fee','Inspection','Other'];
-  const payers=['House','Dan','TBCB','Other'];
+  const payers=['Daniel','Draw','Emilio','Manny'];
   const overlay=document.createElement('div');
   overlay.className='modal-overlay open';overlay.id='editExpModal';
   overlay.innerHTML=`
@@ -1205,7 +1205,7 @@ function editExp(id){
         </div>
         <div class="mf"><label>Contractor / Vendor</label><input type="text" id="ee-vendor" value="${e.vendor||''}"></div>
         <div class="mf"><label>Paid By</label>
-          <select id="ee-paidby">${payers.map(p=>`<option${p===(e.paid_by||'House')?' selected':''}>${p}</option>`).join('')}</select>
+          <select id="ee-paidby">${payers.map(p=>`<option${p===(e.paid_by||'Draw')?' selected':''}>${p}</option>`).join('')}</select>
         </div>
         <div class="mf full"><label>Description</label><input type="text" id="ee-desc" value="${e.description||''}"></div>
         <div class="mf full"><label>Amount ($) — use negative for credits</label><input type="number" id="ee-amount" value="${e.amount}" step="0.01"></div>
@@ -1240,7 +1240,7 @@ async function saveEditExp(id){
 function exportCSV(){
   if(!exps.length){toast('Nothing to export','err');return;}
   const rows=[['#','Date','Category','Vendor','Description','Paid By','Amount']];
-  exps.forEach((e,i)=>rows.push([i+1,e.date,e.category,e.vendor||'',e.description||'',e.paid_by||'House',parseFloat(e.amount).toFixed(2)]));
+  exps.forEach((e,i)=>rows.push([i+1,e.date,e.category,e.vendor||'',e.description||'',e.paid_by||'Draw',parseFloat(e.amount).toFixed(2)]));
   const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
@@ -1270,7 +1270,7 @@ function parseCsvForImport(text){
   const col=name=>header.findIndex(h=>h.includes(name));
   const iDate=col('date'),iCat=col('cat'),iVendor=col('vendor'),iDesc=col('desc'),iAmt=col('amount'),iPaid=col('paid');
   if(iDate===-1||iAmt===-1){toast('CSV must have at least Date and Amount columns','err');return;}
-  const validPayers=['House','Dan','TBCB','Other'];
+  const validPayers=['Daniel','Draw','Emilio','Manny'];
   const rows=[];
   for(let i=1;i<lines.length;i++){
     const parts=lines[i].match(/(".*?"|[^,]+)(?=,|$)/g)||lines[i].split(',');
@@ -1280,8 +1280,8 @@ function parseCsvForImport(text){
     const catRaw=iCat>-1?clean(parts[iCat]||''):'Other';
     const vendor=iVendor>-1?clean(parts[iVendor]||''):'';
     const desc=iDesc>-1?clean(parts[iDesc]||''):'';
-    const paidRaw=iPaid>-1?clean(parts[iPaid]||''):'House';
-    const paid_by=validPayers.find(p=>p.toLowerCase()===paidRaw.toLowerCase())||'House';
+    const paidRaw=iPaid>-1?clean(parts[iPaid]||''):'Draw';
+    const paid_by=validPayers.find(p=>p.toLowerCase()===paidRaw.toLowerCase())||'Draw';
     let date=dateRaw;
     if(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(dateRaw)){
       const p=dateRaw.split(/[\/\-]/);
@@ -1323,7 +1323,7 @@ function showCsvPreview(rows){
       <td style="padding:6px 10px">${r.category}</td>
       <td style="padding:6px 10px">${r.vendor||'—'}</td>
       <td style="padding:6px 10px;color:var(--muted2)">${r.desc||'—'}</td>
-      <td style="padding:6px 10px;color:var(--muted2)">${r.paid_by||'House'}</td>
+      <td style="padding:6px 10px;color:var(--muted2)">${r.paid_by||'Draw'}</td>
       <td style="padding:6px 10px;text-align:right;color:var(--red)">${amtDisplay}</td>
     `;
     tbody.appendChild(tr);
@@ -1335,7 +1335,7 @@ function showCsvPreview(rows){
 
 async function commitCsvImport(){
   if(!isAdmin)return;
-  const toInsert=_csvPendingRows.filter(r=>r._valid).map(r=>({property_id:cur.id,date:r.date,category:r.category,vendor:r.vendor,description:r.desc,amount:r.amount,paid_by:r.paid_by||'House'}));
+  const toInsert=_csvPendingRows.filter(r=>r._valid).map(r=>({property_id:cur.id,date:r.date,category:r.category,vendor:r.vendor,description:r.desc,amount:r.amount,paid_by:r.paid_by||'Draw'}));
   if(!toInsert.length){toast('Nothing to import','err');return;}
   const btn=document.getElementById('csvImportBtn');
   btn.textContent='Importing...';btn.disabled=true;
@@ -1543,15 +1543,15 @@ function printReport(){
   const f=n=>'$'+Math.round(Math.abs(n)).toLocaleString('en-US');
   const f2=n=>n>=0?'+$'+Math.round(n).toLocaleString('en-US'):'-$'+Math.round(Math.abs(n)).toLocaleString('en-US');
   const expRows=exps.map((e,i)=>{
-    const pb=e.paid_by||'House';
-    const pbColor=pb==='House'?'#8892b0':pb==='Dan'?'#c87d00':pb==='TBCB'?'#0d47a1':'#1a6b35';
+    const pb=e.paid_by||'Draw';
+    const pbColor=pb==='Draw'?'#0d47a1':pb==='Daniel'?'#c87d00':pb==='Emilio'?'#1a6b35':'#b71c1c';
     return `<tr><td>${i+1}</td><td>${e.date}</td><td>${e.category}</td><td>${e.vendor||'—'}</td><td>${e.description||'—'}</td><td style="color:${pbColor};font-weight:600;font-size:11px">${pb}</td><td style="text-align:right;font-weight:600">$${parseFloat(e.amount).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td></tr>`;
   }).join('');
 
   // Payer breakdown for print
   const payerTotals={};
-  exps.filter(e=>parseFloat(e.amount)>0).forEach(e=>{const p=e.paid_by||'House';payerTotals[p]=(payerTotals[p]||0)+parseFloat(e.amount);});
-  const payerColors={'House':'#8892b0','Dan':'#c87d00','TBCB':'#0d47a1','Other':'#1a6b35'};
+  exps.filter(e=>parseFloat(e.amount)>0).forEach(e=>{const p=e.paid_by||'Draw';payerTotals[p]=(payerTotals[p]||0)+parseFloat(e.amount);});
+  const payerColors={'Daniel':'#c87d00','Draw':'#0d47a1','Emilio':'#1a6b35','Manny':'#b71c1c'};
   const payerRows=Object.entries(payerTotals).sort((a,b)=>b[1]-a[1]).map(([name,val])=>{
     const pct=expTotal>0?((val/expTotal)*100).toFixed(1):0;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #e8e8f0;font-size:12px"><span style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:2px;background:${payerColors[name]||'#8892b0'};display:inline-block"></span><span style="font-family:'DM Mono',monospace">${name}</span><span style="font-family:'DM Mono',monospace;color:#8892b0;font-size:10px">${pct}%</span></span><span style="font-family:'DM Mono',monospace;font-weight:600;color:${payerColors[name]||'#8892b0'}">$${Math.round(val).toLocaleString('en-US')}</span></div>`;
@@ -1713,7 +1713,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
   </div>
   ${exps.length>0?`<div class="section">
     <div class="section-header"><div class="section-num">04</div><div class="section-title">Rehab Expense Log (${exps.length} Entries)</div><div class="section-line"></div></div>
-    ${payerRows?`<div style="background:#f7f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:14px 18px;margin-bottom:16px"><div style="font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8892b0;margin-bottom:10px">Who the House Owes</div>${payerRows}<div style="font-size:10px;color:#8892b0;font-family:'DM Mono',monospace;margin-top:8px;font-style:italic">House = draw/loan funded. Dan & TBCB = out-of-pocket, reimbursable from proceeds.</div></div>`:''}
+    ${payerRows?`<div style="background:#f7f8fc;border:1px solid #e8e8f0;border-radius:6px;padding:14px 18px;margin-bottom:16px"><div style="font-family:'Montserrat',sans-serif;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8892b0;margin-bottom:10px">Who the House Owes</div>${payerRows}<div style="font-size:10px;color:#8892b0;font-family:'DM Mono',monospace;margin-top:8px;font-style:italic">Draw = loan funded. Daniel, Emilio &amp; Manny = out-of-pocket, reimbursable from proceeds.</div></div>`:''}
     <table class="exp-table">
       <thead><tr><th>#</th><th>Date</th><th>Category</th><th>Contractor / Vendor</th><th>Description</th><th>Paid By</th><th style="text-align:right">Amount</th></tr></thead>
       <tbody>${expRows}</tbody>
