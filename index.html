@@ -443,6 +443,13 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
           <div class="etable-head">
             <span class="etable-title">Expense Log</span>
             <div style="display:flex;gap:8px;align-items:center">
+              <select id="payerFilter" onchange="filterByPayer()" style="background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--muted2);font-family:var(--mono);font-size:11px;padding:5px 10px;outline:none;cursor:pointer">
+                <option value="all">All Payers</option>
+                <option value="Daniel">Daniel</option>
+                <option value="Draw">Draw</option>
+                <option value="Emilio">Emilio</option>
+                <option value="Manny">Manny</option>
+              </select>
               <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Export CSV</button>
               <button class="btn btn-ghost btn-sm" id="importCsvBtn" onclick="document.getElementById('csvFileInput').click()" style="display:none">Import CSV</button>
               <input type="file" id="csvFileInput" accept=".csv" style="display:none" onchange="handleCsvImport(this)">
@@ -1030,6 +1037,8 @@ function updateCalc(){
 // ── EXPENSES ──
 async function loadExps(){
   if(!cur)return;
+  const f=document.getElementById('payerFilter');
+  if(f)f.value='all';
   const {data,error}=await sb.from('expenses').select('*').eq('property_id',cur.id).order('date',{ascending:false});
   if(error){toast('Error loading expenses','err');return;}
   exps=data||[];
@@ -1084,6 +1093,16 @@ function renderExps(){
   });
   renderPayerChart(exps);
   updateCalc();
+}
+
+function filterByPayer(){
+  const val=document.getElementById('payerFilter').value;
+  document.querySelectorAll('#expBody tr[id^="exp-row-"]').forEach(tr=>{
+    if(val==='all'){tr.style.display='';return;}
+    const cell=tr.cells[5];
+    const payer=(cell?.textContent||'').trim().toLowerCase();
+    tr.style.display=payer===val.toLowerCase()?'':'none';
+  });
 }
 
 function renderPayerChart(expenses){
