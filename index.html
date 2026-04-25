@@ -1549,14 +1549,14 @@ function printReport(){
   const intPaid=interestPaidTotal>0?interestPaidTotal:monthly*months;
   const totalOOP=principal+intPaid+Math.max(0,partnersOwed);
   const be=(1-realtorPct-closingPct)>0?(payoff+principal+Math.max(0,partnersOwed))/(1-realtorPct-closingPct):0;
+  const f=n=>'$'+Math.round(Math.abs(n)).toLocaleString('en-US');
+  const f2=n=>n>=0?'+$'+Math.round(n).toLocaleString('en-US'):'-$'+Math.round(Math.abs(n)).toLocaleString('en-US');
   const interestLabel=interestPaidTotal>0
     ?`Interest Paid to Date (${mortgageExps.length} payments)`
     :`Interest \u2014 estimated (${months} mo @ ${f(monthly)}/mo)`;
   const verdict=profit>5000?'PROJECTED PROFIT':profit<-2000?'PROJECTED LOSS':'NEAR BREAK-EVEN';
   const verdictColor=profit>5000?'#1a7a3e':profit<-2000?'#8b1a1a':'#7a5a00';
   const now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-  const f=n=>'$'+Math.round(Math.abs(n)).toLocaleString('en-US');
-  const f2=n=>n>=0?'+$'+Math.round(n).toLocaleString('en-US'):'-$'+Math.round(Math.abs(n)).toLocaleString('en-US');
   const expRows=exps.map((e,i)=>{
     const pb=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
     const pbColor=pb==='Draw'?'#0d47a1':pb==='Daniel'?'#c87d00':pb==='Emilio'?'#1a6b35':'#b71c1c';
