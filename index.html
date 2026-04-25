@@ -333,7 +333,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
             <div class="lrow"><span class="ll">&#x2212; Investors Principal Returned</span><span class="lv neg" id="l-principal">—</span></div>
             <!-- Partners owed — net sum of all non-Draw expenses -->
             <div class="lrow" id="row-partners-owed" style="display:none"><span class="ll">&#x2212; Rehab Over Budget <span class="rehab-tag cash">partners owed</span></span><span class="lv neg" id="l-partners-owed">—</span></div>
-            <div class="lrow" id="row-interest-all"><span class="ll" id="l-interest-label">&#x2212; Total Interest Paid</span><span class="lv neg" id="l-interest">—</span></div>
+            <div class="lrow" id="row-interest-all" style="opacity:.7"><span class="ll" id="l-interest-label" style="font-style:italic">Interest Paid to Date</span><span class="lv" id="l-interest" style="color:var(--muted2)">—</span></div>
             <div class="lrow divider"><span class="ll">= Net Proceeds Pool</span><span class="lv big" id="l-net">—</span></div>
             <div class="lrow" style="border:none;padding-top:6px;padding-bottom:2px"><span class="ll" style="font-size:11px;color:var(--muted)">LTV</span><span class="lv" id="l-ltv" style="font-size:11px;color:var(--muted)">—</span></div>
             <div class="lrow spacer sa-only" id="row-40pct"><span class="ll gold">Your 40% of Net Proceeds</span><span class="lv gold" id="l-40pct">—</span></div>
@@ -402,7 +402,7 @@ tbody td{padding:10px 16px;font-size:13px;font-family:var(--mono);color:var(--te
                 <option>Labor</option><option>Materials</option><option>Permits</option>
                 <option>Plumbing</option><option>Electrical</option><option>HVAC</option>
                 <option>Roofing</option><option>Flooring</option><option>Paint</option>
-                <option>Draw Fee</option><option>Inspection</option><option>Other</option>
+                <option>Draw Fee</option><option>Inspection</option><option>Mortgage Interest</option><option>Other</option>
               </select>
             </div>
             <div class="fld"><label>Contractor / Vendor</label><input type="text" id="eVendor" placeholder="Name"></div>
@@ -869,7 +869,6 @@ function updateCalc(){
   const principal=earnest+down;
   const monthly=cur.monthly_interest||0;
   const months=calcMonthsBilled(cur.closing_date);
-  const interest=monthly*months; // actual billed months only
   const rehabFinanced=cur.rehab_budget||0;          // Financed rehab — in loan payoff
   const cashRehabBudget=cur.cash_rehab_budget||0;   // Cash rehab — out of pocket
   const totalBudget=rehabFinanced+cashRehabBudget;
@@ -878,11 +877,13 @@ function updateCalc(){
 
   const expTotal=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
 
-  // ── New rehab logic ──
-  // Draw expenses = what loan funds actually paid (tracks against financed budget)
-  // Partners owed = net sum of non-Draw expenses (what house must reimburse from proceeds)
+  // Mortgage Interest flows through payer logic — Draw paid = no deduction, Partner paid = hits partnersOwed
+  // Rehab-only expenses for budget tracking
   const normPayer=e=>(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
-  const drawTotal=exps.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
+  const rehabExps=exps.filter(e=>e.category!=='Mortgage Interest');
+  const mortgageExps=exps.filter(e=>e.category==='Mortgage Interest');
+  const interestPaidTotal=mortgageExps.reduce((s,e)=>s+parseFloat(e.amount),0);
+  const drawTotal=rehabExps.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
   const partnersOwed=exps.reduce((s,e)=>normPayer(e)!=='Draw'?s+parseFloat(e.amount):s,0);
   const financedRemaining=Math.max(0,rehabFinanced-drawTotal);
   const drawPct=rehabFinanced>0?Math.min((drawTotal/rehabFinanced)*100,100):0;
@@ -900,12 +901,12 @@ function updateCalc(){
   const closing=arv*closingPct;
 
   // Interest now deducted from net proceeds — visible to all, funded by draws not investor pocket
-  const net=arv-payoff-realtor-closing-principal-Math.max(0,partnersOwed)-interest;
+  const net=arv-payoff-realtor-closing-principal-Math.max(0,partnersOwed);
   const share40=net>0?net*0.40:0;
-  const profit=share40-helocInterest; // HELOC still SA only — personal financing
+  const profit=share40-helocInterest;
   const roi=principal>0?(profit/principal)*100:0;
   const ltv=arv>0?(payoff/arv)*100:0;
-  const intPaid=monthly*months;
+  const intPaid=interestPaidTotal>0?interestPaidTotal:monthly*months;
   const totalOOP=principal+intPaid+helocInterest+Math.max(0,partnersOwed);
 
   // Days held
@@ -937,8 +938,12 @@ function updateCalc(){
   }else{partnersOwedRow.style.display='none';}
 
   const intLabel=document.getElementById('l-interest-label');
-  if(intLabel)intLabel.textContent='\u2212 Total Interest ('+months+' mo @ '+fmt(monthly)+'/mo)';
-  document.getElementById('l-interest').textContent=interest>0?'('+fmt(interest)+')':'—';
+  if(intLabel){
+    intLabel.textContent=interestPaidTotal>0
+      ?'Interest Paid to Date ('+mortgageExps.length+' payments)'
+      :'Interest \u2014 estimated ('+months+' mo @ '+fmt(monthly)+'/mo)';
+  }
+  document.getElementById('l-interest').textContent=intPaid>0?fmt(intPaid):'—';
 
   const ltvEl=document.getElementById('l-ltv');
   if(ltvEl){ltvEl.textContent=arv>0?ltv.toFixed(1)+'%':'—';ltvEl.style.color=ltv<=70?'var(--green)':ltv<=85?'var(--gold)':'var(--red)';}
@@ -990,7 +995,7 @@ function updateCalc(){
   else if(profit<-2000){vEl.className='verdict loss';vEl.textContent='\u25bc Losing Money';}
   else{vEl.className='verdict even';vEl.textContent='\u2248 Break Even';}
 
-  const be=(1-realtorPct-closingPct)>0?(payoff+principal+interest+Math.max(0,partnersOwed))/(1-realtorPct-closingPct):0;
+  const be=(1-realtorPct-closingPct)>0?(payoff+principal+Math.max(0,partnersOwed))/(1-realtorPct-closingPct):0;
   document.getElementById('breakEven').textContent=be>0?fmt(Math.ceil(be/5000)*5000):'—';
 
   // ── Rehab Draw panel ──
@@ -1005,7 +1010,9 @@ function updateCalc(){
   // ── Break-even OOP panel ──
   document.getElementById('ov-earnest').textContent=earnest>0?fmt(earnest):'—';
   document.getElementById('ov-down').textContent=down>0?fmt(down):'—';
-  document.getElementById('ov-int-paid').textContent=intPaid>0?fmt(intPaid)+' ('+months+' mo)':'—';
+  document.getElementById('ov-int-paid').textContent=intPaid>0
+    ?(interestPaidTotal>0?fmt(intPaid)+' ('+mortgageExps.length+' payments)':fmt(intPaid)+' ('+months+' mo est.)')
+    :'—';
 
   const partnersOopRow=document.getElementById('ov-partners-row');
   const partnersOopAmt=document.getElementById('ov-partners-amt');
@@ -1031,7 +1038,8 @@ function renderExps(){
   const cashRehabBudget=cur?.cash_rehab_budget||0;
   const totalBudget=rehabFinanced+cashRehabBudget;
   const normPayer=e=>(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
-  const drawTotal=exps.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
+  const rehabOnly=exps.filter(e=>e.category!=='Mortgage Interest');
+  const drawTotal=rehabOnly.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
   const total=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
   const financedRem=Math.max(0,rehabFinanced-drawTotal);
   const pct=rehabFinanced>0?Math.min((drawTotal/rehabFinanced)*100,100):0;
@@ -1089,10 +1097,10 @@ function renderPayerChart(expenses){
   if(!expenses.length){wrap.style.display='none';return;}
   wrap.style.display='block';
 
-  // Tally by payer — credits subtract from what the house owes them
+  // Tally by payer — credits subtract, debits add — exclude Mortgage Interest (not a partner debt)
   const colors={'Daniel':'#e8a020','Draw':'#4dabf7','Emilio':'#2dd36f','Manny':'#ff6b6b'};
   const totals={};
-  expenses.forEach(e=>{
+  expenses.filter(e=>e.category!=='Mortgage Interest').forEach(e=>{
     const p=(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
     totals[p]=(totals[p]||0)+parseFloat(e.amount);
   });
@@ -1191,7 +1199,7 @@ function editExp(id){
   if(!e)return;
   const existing=document.getElementById('editExpModal');
   if(existing)existing.remove();
-  const cats=['Labor','Materials','Permits','Plumbing','Electrical','HVAC','Roofing','Flooring','Paint','Draw Fee','Inspection','Other'];
+  const cats=['Labor','Materials','Permits','Plumbing','Electrical','HVAC','Roofing','Flooring','Paint','Draw Fee','Inspection','Mortgage Interest','Other'];
   const payers=['Daniel','Draw','Emilio','Manny'];
   const overlay=document.createElement('div');
   overlay.className='modal-overlay open';overlay.id='editExpModal';
@@ -1263,7 +1271,7 @@ function handleCsvImport(input){
 }
 
 function parseCsvForImport(text){
-  const validCategories=['Labor','Materials','Permits','Plumbing','Electrical','HVAC','Roofing','Flooring','Paint','Draw Fee','Inspection','Other'];
+  const validCategories=['Labor','Materials','Permits','Plumbing','Electrical','HVAC','Roofing','Flooring','Paint','Draw Fee','Inspection','Mortgage Interest','Other'];
   const lines=text.trim().split('\n').map(l=>l.trim()).filter(l=>l);
   if(lines.length<2){toast('CSV is empty or has no data rows','err');return;}
   const header=lines[0].split(',').map(h=>h.replace(/"/g,'').trim().toLowerCase());
@@ -1518,7 +1526,6 @@ function printReport(){
   const principal=earnest+down;
   const monthly=cur.monthly_interest||0;
   const months=calcMonthsBilled(cur.closing_date);
-  const interest=monthly*months; // actual billed months only
   const rehabFinanced=cur.rehab_budget||0;
   const cashRehabBudget=cur.cash_rehab_budget||0;
   const totalBudget=rehabFinanced+cashRehabBudget;
@@ -1528,17 +1535,23 @@ function printReport(){
   const closing=arv*closingPct;
   const expTotal=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
   const normPayer=e=>(e.paid_by||'Draw')==='House'?'Draw':e.paid_by||'Draw';
-  const drawTotal=exps.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
+  const rehabExps=exps.filter(e=>e.category!=='Mortgage Interest');
+  const mortgageExps=exps.filter(e=>e.category==='Mortgage Interest');
+  const interestPaidTotal=mortgageExps.reduce((s,e)=>s+parseFloat(e.amount),0);
+  const drawTotal=rehabExps.reduce((s,e)=>normPayer(e)==='Draw'?s+parseFloat(e.amount):s,0);
   const partnersOwed=exps.reduce((s,e)=>normPayer(e)!=='Draw'?s+parseFloat(e.amount):s,0);
   const financedRemaining=Math.max(0,rehabFinanced-drawTotal);
-  const net=arv-payoff-realtor-closing-principal-Math.max(0,partnersOwed)-interest;
+  const net=arv-payoff-realtor-closing-principal-Math.max(0,partnersOwed);
   const share40=net>0?net*0.40:0;
-  const profit=share40; // HELOC handled separately for SA
+  const profit=share40;
   const roi=principal>0?(profit/principal)*100:0;
   const ltv=arv>0?(payoff/arv)*100:0;
-  const intPaid=monthly*months;
+  const intPaid=interestPaidTotal>0?interestPaidTotal:monthly*months;
   const totalOOP=principal+intPaid+Math.max(0,partnersOwed);
-  const be=(1-realtorPct-closingPct)>0?(payoff+principal+interest+Math.max(0,partnersOwed))/(1-realtorPct-closingPct):0;
+  const be=(1-realtorPct-closingPct)>0?(payoff+principal+Math.max(0,partnersOwed))/(1-realtorPct-closingPct):0;
+  const interestLabel=interestPaidTotal>0
+    ?`Interest Paid to Date (${mortgageExps.length} payments)`
+    :`Interest \u2014 estimated (${months} mo @ ${f(monthly)}/mo)`;
   const verdict=profit>5000?'PROJECTED PROFIT':profit<-2000?'PROJECTED LOSS':'NEAR BREAK-EVEN';
   const verdictColor=profit>5000?'#1a7a3e':profit<-2000?'#8b1a1a':'#7a5a00';
   const now=new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
@@ -1665,7 +1678,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
       <tr><td>&#x2212; Closing Costs (${cur.closing_costs_pct!=null?cur.closing_costs_pct:2}%)</td><td class="neg">(${f(closing)})</td></tr>
       <tr><td>&#x2212; Investors Principal Returned</td><td class="neg">(${f(principal)})</td></tr>
       ${partnersLedgerRow}
-      <tr><td>&#x2212; Total Interest (${months} mo @ ${f(monthly)}/mo)</td><td class="neg">(${f(interest)})</td></tr>
+      <tr style="opacity:.7"><td style="font-style:italic">${interestLabel}</td><td style="font-family:'DM Mono',monospace;color:#5a6080">${intPaid>0?f(intPaid):'—'}</td></tr>
       <tr class="subtotal"><td>= Net Proceeds Pool</td><td class="${net>=0?'pos':'neg'}">${net>=0?f(net):'-'+f(Math.abs(net))}</td></tr>
       ${isSuperAdmin?`
       <tr class="highlight"><td class="gold">Your 40% of Net Proceeds (Equity Share)</td><td class="gold">${net>0?f(share40):'— No proceeds'}</td></tr>
@@ -1683,7 +1696,7 @@ body{font-family:'EB Garamond',Georgia,serif;background:#fff;color:#1a1a2e;font-
         <div class="info-box-title">Your Cash Position</div>
         <div class="info-row"><span class="info-label">Earnest Money</span><span class="info-val neg">(${f(earnest)})</span></div>
         <div class="info-row"><span class="info-label">Down Payment</span><span class="info-val neg">(${f(down)})</span></div>
-        <div class="info-row"><span class="info-label">Interest Paid (${months} mo)</span><span class="info-val neg">(${f(intPaid)})</span></div>
+        <div class="info-row"><span class="info-label">Interest Paid ${interestPaidTotal>0?'('+mortgageExps.length+' payments)':'('+months+' mo est.)'}</span><span class="info-val neg">(${f(intPaid)})</span></div>
         ${partnersOOPRow}
         <div class="info-row" style="border-top:2px solid #1a1a2e;margin-top:4px;padding-top:12px"><span class="info-label" style="font-weight:600;color:#1a1a2e">Total Out of Pocket</span><span class="info-val neg" style="font-size:14px">(${f(totalOOP)})</span></div>
       </div>
